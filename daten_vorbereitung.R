@@ -8,12 +8,13 @@ library(summarytools)
 
 
 ## Arbeitsverzeichnis
-setwd("/Volumes/Secomba/ejahnke/Boxcryptor/iCloud/Uni/KU Ingolstadt/SoSe 21/Data Analytics (Challenge)/DMC-2021-Task/")
 getwd()
 
 ## Daten
-items_raw <- read.csv(file = "items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-transactions_raw <- read.csv(file = "transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+dim(items_raw)    #78 334 x 6
+transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+dim(transactions_raw)  #365 143 x 5
 
 # als Tibble kovertieren
 items_tbl <- as_tibble(items_raw)
@@ -81,4 +82,50 @@ summarytools::freq(transactions_tbl$basket)
 summarytools::freq(transactions_tbl$order)
 summarytools::view(descr(transactions_tbl))
 
+#Merge Datasets mit alle sessionIDs
+length(unique(items_tbl$itemID))
+length(unique(transactions_tbl$itemID))
+joined_tbl <- left_join(items_tbl,transactions_tbl, by = "itemID") #418 568 x 10
 
+#reifolge der Spalten verändern
+joined_tbl <- joined_tbl[c(1,7:10,2:6)] 
+joined_tbl <- joined_tbl %>% mutate(main.topic = as.factor(main.topic))
+joined_tbl
+
+#wie oft jeder main.topic im Laden vorkommt
+count_maintopics <- count(items_tbl, main.topic) %>% arrange(desc(n))
+count_maintopics
+ggplot(count_maintopics) + geom_histogram(aes(x=n))
+count_maintopics %>% filter(n > 500)   #33 Themen am meinsten vorhanden
+ggplot(count_maintopics) + geom_histogram(aes(x=n), breaks = seq(0,500,25))
+ggplot(count_maintopics) + geom_histogram(aes(x=n), breaks = seq(0,100,25))
+count_maintopics %>% filter(n < 25)    #540/700 Themen kommen ganz selten vor
+#dementsprechend müssen sie gruppiert werden auf der Phase feature engineering
+
+
+########################
+#Top Themen im Laden 
+
+#FM Fantasyliteratur
+#YFB Kinder/Jugendliche: Gegenwartsliteratur
+#FL Science-Fiction
+#YFH Kinder/Jugendliche: Fantasy
+#YFC Kinder/Jugendliche: Action- und Abenteuergeschichten
+
+
+#main_topics,an die Kunden am meisten Interesse haben
+joined_tbl %>% group_by(main.topic) %>% count(main.topic) %>% arrange(desc(n))
+
+########################
+#Top Themen an die Kunden Interesse haben 
+
+#FMB  Fantasy
+#YFH  Fantasy and magical realism (Children’s/Teenage)
+#YBG Interactive and activity books and packs…
+#FM Fantasyliteratur
+#YFHR Fantasy romance (Teenage)
+
+length(unique(transactions_tbl$sessionID)) # unique sessions 271 983 
+##nur duplicated sessions
+transactions_tbl[transactions_tbl$sessionID %in% 
+               transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
