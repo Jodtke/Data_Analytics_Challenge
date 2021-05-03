@@ -1,5 +1,7 @@
 ############ Data Mining Cup ##########
 
+############ Data Analytics Challenge ##########
+
 ### Vorbereitung
 
 ## Packages
