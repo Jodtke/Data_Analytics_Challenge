@@ -170,29 +170,21 @@ my_palette <- c("#61BB6D","#7CC77A","#C3E698",
                 "#DBF0A4", "#E9F6AF", "#F7FCBA",
                 "#FBFDCF", "#FFFFE5", "#95D284",
                 "#AEDD8E")
-main_topics <- main_topics %>% mutate(lbls = c("FM"="Fantasy literature", 
-                                               "YFB" = "Children’s and teenage: contemporary literature",
-                                               "FL" = "Science-Fiction",
-                                               "YFH" = "Children’s and teenage: fantasy and magical realism ",
-                                               "YFC" = "Children’s and teenage: action and adventure",
-                                               "YF" = "Children’s and teenage: fiction and true stories",
-                                               "YBG" = "Learning material: interactive and activity books",
-                                               "FMB" = "Fiction and related items",
-                                               "YFCF" = "Children’s: crime and mystery fiction",
-                                               "YFJ" = "Children’s: traditional stories"))
-                                "YFB" = "Children’s and teenage: contemporary literature",
-                                "FL" = "Science-Fiction",
-                                "YFH" = "Children’s and teenage: fantasy and magical realism ",
-                                "YFC" = "Children’s and teenage: action and adventure",
-                                "YF" = "Children’s and teenage: fiction and true stories",
-                                "YBG" = "Learning material: interactive and activity books",
-                                "FMB" = "Fiction and related items",
-                                "YFCF" = "Children’s: crime and mystery fiction",
-                                "YFJ" = "Children’s: traditional stories"))
+main_topics <- main_topics %>%
+  mutate(lbls = c("FM"="Fantasy literature", 
+                  "YFB" = "Children’s and teenage: contemporary literature",
+                  "FL" = "Science-Fiction",
+                  "YFH" = "Children’s and teenage: fantasy and magical realism ",
+                  "YFC" = "Children’s and teenage: action and adventure",
+                  "YF" = "Children’s and teenage: fiction and true stories",
+                  "YBG" = "Learning material: interactive and activity books",
+                  "FMB" = "Fiction and related items",
+                  "YFCF" = "Children’s: crime and mystery fiction",
+                  "YFJ" = "Children’s: traditional stories"))
 # main_topics
 g <- ggplot(data = main_topics, mapping = aes(x = reorder(main.topic, desc(N)), y = N, fill = my_palette))
 g + geom_col(fill = my_palette) +
-  geom_text(data = main_topics, aes(x=main.topic, y=100, label = lbls, hjust=0, angle=90))+
+  geom_text(data = main_topics, aes(x=main.topic, y=100, label = lbls, hjust=0, angle=90)) +
   ggtitle("10 best Bookstore available topics") +
   theme(plot.title = element_text(size = 25),
         axis.title.x = element_text(size = 16),
