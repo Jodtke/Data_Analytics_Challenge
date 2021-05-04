@@ -21,6 +21,9 @@ dim(openRefine)
 # als Tibble kovertieren
 items_tbl <- as_tibble(items_raw)
 transactions_tbl <- as_tibble(transactions_raw)
+# bereinigter Datensatz aus Open Refine
+oR_tbl <- as_tibble(openRefine)
+head(oR_tbl, n = 20)
 
 ###### Datenexploration ######
 ### Items
@@ -94,9 +97,13 @@ summarytools::view(descr(transactions_tbl))
 # Merge Datasets mit alle sessionIDs
 length(unique(items_tbl$itemID))
 length(unique(transactions_tbl$itemID))
+# ursprünglicher Datensatz
 joined_tbl <- left_join(items_tbl,transactions_tbl, by = "itemID") #418 568 x 10
 glimpse(joined_tbl)
 head(joined_tbl, n = 20)
+# Open Refine Datensatz
+joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
+head(joined_oR, n = 20)
 
 # Reihenfolge der Spalten verändern
 joined_tbl <- joined_tbl[c(1,7:10,2:6)] 
