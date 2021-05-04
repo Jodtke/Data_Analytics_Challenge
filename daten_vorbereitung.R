@@ -8,6 +8,7 @@ library(janitor)
 library(summarytools)
 library(tmaptools)
 library(arules)
+library(arulesViz)
 
 ## Arbeitsverzeichnis
 getwd()
@@ -202,7 +203,10 @@ glimpse(joined_oR)
 head(joined_oR, n = 20)
 # Reihenfolge der Spalten verändern
 joined_oR <- joined_oR[c(1,7:10,2:6)] 
-joined_oR <- joined_oR %>% mutate(main.topic = as.factor(main.topic))
+joined_oR <- joined_oR %>%
+  mutate(main.topic = as.factor(main.topic),
+         itemID = as.character(itemID),
+         sessionID = as.character(sessionID))
 head(joined_oR, n = 20)
 
 # wie oft jeder main.topic im Laden vorkommt
@@ -292,3 +296,31 @@ bestseller_topics <- joined_tbl %>%
             N = n()) %>%
   arrange(desc(nOrder)) %>%
   print()
+
+### Transaction Matrix erstellen
+iLabels <- itemLabels(joined_oR$itemID)
+
+
+
+transaction_frame <- joined_oR %>%
+  mutate(main.topic = as.factor(main.topic),
+         itemID = as.factor(itemID),
+         sessionID = as.factor(sessionID),
+         click = as.factor(click),
+         basket = as.factor(basket),
+         order = as.factor(order),
+         title = as.factor(title),
+         author = as.factor(author),
+         publisher = as.factor(publisher),
+         subtopics = as.factor(subtopics)) %>%
+  as("transactions")
+
+trans <- as(joined_oR, "transactions")
+rules <- apriori(trans, parameter = list(minlen=2, supp=0.005, conf=0.8))
+inspect(rules)
+
+rules.sorted <- sort(rules, by = "lift")
+inspect(rules.sorted)
+inspectDT(rules.sorted)
+plot(rules.sorted, method="grouped")
+#
