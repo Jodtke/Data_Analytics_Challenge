@@ -15,7 +15,7 @@ items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = 
 dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/openRefine_items_transactions.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F)
+openRefine <- read.csv(file = "./Data/oRe_items.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F)
 
 # als Tibble kovertieren
 items_tbl <- as_tibble(items_raw)
