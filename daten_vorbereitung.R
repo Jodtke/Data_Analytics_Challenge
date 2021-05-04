@@ -16,10 +16,14 @@ dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
 
+openRefine <- read.csv(file = "C:/Users/Liulia/Documents/R/oR_items.csv", header = T, sep = ";", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+dim(openRefine)
+
+
 # als Tibble kovertieren
 items_tbl <- as_tibble(items_raw)
 transactions_tbl <- as_tibble(transactions_raw)
-
+openRefin_tbl <- as_tibble(openRefine)
 ###### Datenexploration ######
 # Items
 glimpse(items_tbl)
@@ -74,6 +78,7 @@ transactions_tbl %>%
 ## summarytools
 # Items
 summarytools::dfSummary(items_tbl)
+summarytools::dfSummary(openRefin_tbl)
 summarytools::freq(items_tbl$author)
 # summarytools::freq(items_tbl) # ACHTUNG: Häufigkeit für JEDE unterschiedlich Beobachtung
 
@@ -91,7 +96,7 @@ joined_tbl <- left_join(items_tbl,transactions_tbl, by = "itemID") #418 568 x 10
 #reifolge der Spalten verändern
 joined_tbl <- joined_tbl[c(1,7:10,2:6)] 
 joined_tbl <- joined_tbl %>% mutate(main.topic = as.factor(main.topic))
-joined_tbl
+joined_tbl %>% arrange(itemID)
 
 #wie oft jeder main.topic im Laden vorkommt
 count_maintopics <- count(items_tbl, main.topic) %>% arrange(desc(n))
@@ -174,12 +179,31 @@ ggsave("10_available_topics.jpeg", width = 297, height = 210, units = "mm")
 
 ####HEATMAPE with 10 main best sell topics 
 
-#joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
-  #group_by(main.topic)%>%
-  
+################################################################################
+#auf basis openRefin_tbl plotten, wo title,publischer,subtopics zusammengefügt 
+################################################################################
+openRefin_tbl <-  openRefin_tbl %>% rename("itemID" = "ï..itemID")
+joined_tbl <- left_join(openRefin_tbl, transactions_tbl, by = "itemID")
+#daten vorbereiten
+joined_tbl <- joined_tbl[c(1,7:10,2:6)] 
+
+joined_tbl
 bestseller_topics <- joined_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click),
             nBasket = sum(basket), 
-            nOrder = sum(order), 
-            N = n()) %>% arrange(desc(nOrder)) %>% print()
+            nOrder = sum(order),
+            N = n()) %>% 
+  arrange(desc(nOrder)) %>% print()
+bestseller_topics <- bestseller_topics[1:10,]
+bestseller_topics_joined_tbl <- left_join(bestseller_topics, openRefin_tbl, by = "itemID")
+bestseller_topics <-  bestseller_topics_joined_tbl %>% select(main.topic, nClick, nBasket, nOrder)
+
+ggplot(bestseller_topics, aes(x= bestseller_topics[,2:4], y= bestseller_topics[,1], fill = bestseller_topics[,2:4]))+ geom_tile()
+
+
+
+
+rownames(bestseller_topics) <- bestseller_topics[,1]
+bestseller_topics <- as.data.frame(bestseller_topics)
+row.names(bestseller_topics) <- bestseller_topics[,1]
