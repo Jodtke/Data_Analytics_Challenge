@@ -4,7 +4,9 @@
 
 ## Packages
 library(tidyverse)
+library(janitor)
 library(summarytools)
+library(tmaptools)
 library(arules)
 
 ## Arbeitsverzeichnis
@@ -155,7 +157,6 @@ transactions_tbl[transactions_tbl$sessionID %in%
 ################ visualisation ##########
 #######################################
 #bar plot with 10 main topics in the book shop
-library(tmaptools)
 g_by_topic <- items_tbl %>% 
   select(itemID, main.topic) %>%
   group_by(main.topic) %>%
