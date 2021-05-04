@@ -202,5 +202,6 @@ bestseller_topics <- joined_tbl %>%
   summarise(nClick = sum(click),
             nBasket = sum(basket), 
             nOrder = sum(order), 
-            N = n()) %>% arrange(desc(nOrder)) %>% print()
-                   transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
+            N = n()) %>%
+  arrange(desc(nOrder)) %>%
+  print()
