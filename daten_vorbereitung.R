@@ -143,4 +143,4 @@ joined_tbl %>% group_by(main.topic) %>% count(main.topic) %>% arrange(desc(n))
 length(unique(transactions_tbl$sessionID)) # unique sessions 271 983 
 ##nur duplicated sessions
 transactions_tbl[transactions_tbl$sessionID %in% 
-               transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
+                   transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
