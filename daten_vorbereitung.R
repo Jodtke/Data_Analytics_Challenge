@@ -179,15 +179,6 @@ main_topics <- main_topics %>% mutate(lbls = c("FM"="Fantasy literature",
                                                "FMB" = "Fiction and related items",
                                                "YFCF" = "Children’s: crime and mystery fiction",
                                                "YFJ" = "Children’s: traditional stories"))
-                                "YFB" = "Children’s and teenage: contemporary literature",
-                                "FL" = "Science-Fiction",
-                                "YFH" = "Children’s and teenage: fantasy and magical realism ",
-                                "YFC" = "Children’s and teenage: action and adventure",
-                                "YF" = "Children’s and teenage: fiction and true stories",
-                                "YBG" = "Learning material: interactive and activity books",
-                                "FMB" = "Fiction and related items",
-                                "YFCF" = "Children’s: crime and mystery fiction",
-                                "YFJ" = "Children’s: traditional stories"))
 # main_topics
 g <- ggplot(data = main_topics, mapping = aes(x = reorder(main.topic, desc(N)), y = N, fill = my_palette))
 g + geom_col(fill = my_palette) +
@@ -204,7 +195,7 @@ ggsave("10_available_topics.jpeg", width = 297, height = 210, units = "mm")
 ####HEATMAPE with 10 main best sell topics 
 
 #joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
-  #group_by(main.topic)%>%
+#group_by(main.topic)%>%
 bestseller_topics <- joined_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click),
