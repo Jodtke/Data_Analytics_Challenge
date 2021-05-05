@@ -107,20 +107,20 @@ for(i in 1:length(x = names)){
 
 search_for;
 
-[1] "John Smith"
+# [1] "John Smith"
 
 cbind(names, match_statuses);
 
-names             match_statuses
-[1,] "John Smith"      "TRUE"        
-[2,] "Wigberht Ernust" "FALSE"       
-[3,] "Samir Henning"   "FALSE"       
-[4,] "Everette Arron"  "FALSE"       
-[5,] "Erik Conor"      "FALSE"       
-[6,] "Smith J"         "TRUE"        
-[7,] "Smith John"      "TRUE"        
-[8,] "John S"          "TRUE"
-[9,] "John Sally"      "FALSE"
+# names             match_statuses
+# [1,] "John Smith"      "TRUE"        
+# [2,] "Wigberht Ernust" "FALSE"       
+# [3,] "Samir Henning"   "FALSE"       
+# [4,] "Everette Arron"  "FALSE"       
+# [5,] "Erik Conor"      "FALSE"       
+# [6,] "Smith J"         "TRUE"        
+# [7,] "Smith John"      "TRUE"        
+# [8,] "John S"          "TRUE"
+# [9,] "John Sally"      "FALSE"
 
 ################## Pattern Mining - Advanced ############
 # libraries
@@ -247,3 +247,6 @@ for(i in 1:length(names)){
 search_for;
 
 cbind(names, match_statuses);
+#
+#
+#
