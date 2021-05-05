@@ -48,30 +48,60 @@ head(joined_oR, n = 20)
 
 ## Split Sets
 # Beobachtungen extrahieren
-itemMat_raw <- joined_oR %>%
+itemMat_raw <- transactions_tbl%>%
   select(sessionID, itemID, order) %>% # nur drei essentielle Variablen: Session, Item & Kaufentscheidung
-  head(n=10000) %>% # erste 10000 Beobachtungen
+  head(n=36500) %>% # erste 36500 Beobachtungen
   spread(key = itemID, value = order)
 # Zelleneinträge binär kodieren & Item-Matrix entwerfen
-itemMat_raw <- lapply(itemMat_raw, function(x) ifelse(is.na(x) | x==0, 0, 1)) # einzelne Beobachtungen in 0 & 1 umwandeln
+itemMat_raw <- lapply(itemMat_raw, function(x) ifelse(is.na(x) | x==0, F, T)) # einzelne Beobachtungen in 0 & 1 umwandeln
 itemMat_raw <- as_tibble(itemMat_raw) # als Tibble konvertieren
 itemMat_raw <- itemMat_raw[,-1] # sessionID als Variable entfernen
 itemMat_raw <- as.matrix(itemMat_raw) # als Matrix umwandeln
 itemMatrix <- as(itemMat_raw, "itemMatrix")
-arules::summary(itemMatrix)
+summary(itemMatrix)
 #size(itemMatrix)
 #itemInfo(itemMatrix)
 
 # Rules mit apriori definieren
-rules <- apriori(itemMatrix, parameter =  list(support = 0.0005, confidence = 0.5))
+rules <- apriori(itemMatrix, parameter =  list(support = 0.00005, maxlen = 9, confidence = 0.5))
 # Rules untersuchen, grafisch & "normal"
 summary(rules)
-plot(rules, method = "graph")
-inspect(head(sort(rules, by = "lift"), n=10))
+#plot(rules, method = "graph")
+inspect(head(sort(rules, by = "support"), n=10))
+# hochfrequente Items suchen
+oR_tbl %>% filter(itemID == 14093 | itemID == 47221)
+oR_tbl %>% filter(itemID == 69073 | itemID == 27041)
+oR_tbl %>% filter(itemID == 4626 | itemID == 61335)
+
+
+### Transaction Matrix erstellen
+trans_seq <- joined_oR %>%
+  group_by(sessionID) %>%
+  summarize(
+    SIZE = n(),
+    itemID = as.character(itemID),
+    nOrder = sum(order),
+    nClick = sum(click)
+  )    
+trans_seq
 
 
 
+transaction_1 <- joined_oR %>%
+  mutate(click = as.factor(click),
+         basket = as.factor(basket),
+         order = as.factor(order),
+         title = as.factor(title),
+         author = as.factor(author),
+         publisher = as.factor(publisher),
+         subtopics = as.factor(subtopics)) %>%
+  as("transactions")
+arules::summary(transaction_1)
 
+transaction_2 <- as(joined_oR, "transactions")
+rules2 <- apriori(transaction_2, parameter = list(minlen=2, support=0.005, confidence=0.8))
+arules::summary(rules2)
+inspect(head(sort(rules2, by="lift"), n = 10))
 
 
 
