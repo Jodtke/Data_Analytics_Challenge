@@ -9,7 +9,6 @@ library(tidyverse)
 #library(tmaptools)
 library(arules)
 library(arulesViz)
-library(arulesSequences)
 
 ## Arbeitsverzeichnis
 getwd()
@@ -23,7 +22,7 @@ openRefine <- read.csv(file = "./Data/oR_items.csv", header = T, sep = ";", row.
 dim(openRefine)
 
 # als Tibble kovertieren
- items_tbl <- as_tibble(items_raw)
+# items_tbl <- as_tibble(items_raw)
 # glimpse(items_tbl)
 # head(items_tbl, n = 20)
 transactions_tbl <- as_tibble(transactions_raw)
@@ -199,7 +198,9 @@ transactions_tbl[transactions_tbl$sessionID %in%
 #   arrange(desc(nOrder)) %>%
 #   print()
 
+
 ############################## Joining - Open Refine Datensatz ##################################
+#### Open Refine Datensatz
 joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
 glimpse(joined_oR)
 head(joined_oR, n = 20)
@@ -299,3 +300,34 @@ bestseller_topics <- joined_oR %>%
   arrange(desc(nOrder)) %>%
   print()
 
+### Transaction Matrix erstellen
+
+
+
+trans_seq <- joined_oR %>%
+  group_by(sessionID) %>%
+  summarize(
+    SIZE = n()
+  )    
+trans_seq
+
+
+
+transaction_1 <- joined_oR %>%
+  mutate(click = as.factor(click),
+         basket = as.factor(basket),
+         order = as.factor(order),
+         title = as.factor(title),
+         author = as.factor(author),
+         publisher = as.factor(publisher),
+         subtopics = as.factor(subtopics)) %>%
+  as("transactions")
+
+rules <- apriori(trans, parameter = list(minlen=2, supp=0.005, conf=0.8))
+inspect(rules)
+
+rules.sorted <- sort(rules, by = "lift")
+inspect(rules.sorted)
+inspectDT(rules.sorted)
+plot(rules.sorted, method="grouped")
+#
