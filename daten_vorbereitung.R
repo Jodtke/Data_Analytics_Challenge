@@ -9,6 +9,7 @@ library(tidyverse)
 #library(tmaptools)
 library(arules)
 library(arulesViz)
+library(arulesSequences)
 
 ## Arbeitsverzeichnis
 getwd()
@@ -22,16 +23,16 @@ openRefine <- read.csv(file = "./Data/oR_items.csv", header = T, sep = ";", row.
 dim(openRefine)
 
 # als Tibble kovertieren
-# items_tbl <- as_tibble(items_raw)
+ items_tbl <- as_tibble(items_raw)
 # glimpse(items_tbl)
 # head(items_tbl, n = 20)
 transactions_tbl <- as_tibble(transactions_raw)
 glimpse(transactions_tbl)
-head(transactions_tbl, n = 20)
+head(transactions_tbl, n = 10)
 # bereinigter Datensatz aus Open Refine
 oR_tbl <- as_tibble(openRefine)
 glimpse(oR_tbl)
-head(oR_tbl, n = 20)
+head(oR_tbl, n = 10)
 
 ################################## Datenexploration ###########################################
 ### Items
@@ -123,7 +124,7 @@ transactions_tbl %>%
 # summarytools::freq(transactions_tbl$click)
 # summarytools::freq(transactions_tbl$basket)
 # summarytools::freq(transactions_tbl$order)
-summarytools::view(descr(transactions_tbl))
+#summarytools::view(descr(transactions_tbl))
 
 # einzigartige itemID's
 #length(unique(items_tbl$itemID))
@@ -198,7 +199,7 @@ transactions_tbl[transactions_tbl$sessionID %in%
 #   arrange(desc(nOrder)) %>%
 #   print()
 
-#### Open Refine Datensatz
+############################## Joining - Open Refine Datensatz ##################################
 joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
 glimpse(joined_oR)
 head(joined_oR, n = 20)
@@ -299,7 +300,13 @@ bestseller_topics <- joined_oR %>%
   print()
 
 ### Transaction Matrix erstellen
-iLabels <- itemLabels(joined_oR$itemID)
+trans_seq <- joined_oR %>%
+  group_by(sessionID) %>%
+  summarize(
+    SIZE = n()
+  )    
+trans_seq
+
 
 
 transaction_1 <- joined_oR %>%
