@@ -8,13 +8,9 @@
 library(arules)
 library(arulesViz)
 
-# Arbeitsverzeichnis
-setwd("/Volumes/Secomba/ejahnke/Boxcryptor/iCloud/Uni/KU Ingolstadt/SoSe 21/Data Science - Methoden/R-Skripte")
-getwd()
-
 # Load the weather and Groceries dataset.
 
-weather <- read.table("weather.txt", header = T)
+weather <- read.table("./Data/weather.txt", header=T)
 data("Groceries")
 
 #-------------------------------------------------------------------------------
