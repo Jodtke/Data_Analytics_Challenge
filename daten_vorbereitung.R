@@ -4,9 +4,9 @@
 
 ## Packages
 library(tidyverse)
-library(janitor)
-library(summarytools)
-library(tmaptools)
+#library(janitor)
+#library(summarytools)
+#library(tmaptools)
 library(arules)
 library(arulesViz)
 
@@ -14,23 +14,24 @@ library(arulesViz)
 getwd()
 
 ## Daten
-items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-dim(items_raw)    #78 334 x 6
+#items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+#dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
 openRefine <- read.csv(file = "./Data/oR_items.csv", header = T, sep = ";", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
 dim(openRefine)
 
 # als Tibble kovertieren
-items_tbl <- as_tibble(items_raw)
-glimpse(items_tbl)
-head(items_tbl, n = 20)
+# items_tbl <- as_tibble(items_raw)
+# glimpse(items_tbl)
+# head(items_tbl, n = 20)
 transactions_tbl <- as_tibble(transactions_raw)
 glimpse(transactions_tbl)
-head(transactions_tbl, n = 20)
+head(transactions_tbl, n = 10)
 # bereinigter Datensatz aus Open Refine
 oR_tbl <- as_tibble(openRefine)
-head(oR_tbl, n = 20)
+glimpse(oR_tbl)
+head(oR_tbl, n = 10)
 
 ################################## Datenexploration ###########################################
 ### Items
@@ -122,10 +123,10 @@ transactions_tbl %>%
 # summarytools::freq(transactions_tbl$click)
 # summarytools::freq(transactions_tbl$basket)
 # summarytools::freq(transactions_tbl$order)
-summarytools::view(descr(transactions_tbl))
+#summarytools::view(descr(transactions_tbl))
 
 # einzigartige itemID's
-length(unique(items_tbl$itemID))
+#length(unique(items_tbl$itemID))
 length(unique(transactions_tbl$itemID))
 length(unique(oR_tbl$itemID))
 
@@ -197,6 +198,8 @@ transactions_tbl[transactions_tbl$sessionID %in%
 #   arrange(desc(nOrder)) %>%
 #   print()
 
+
+############################## Joining - Open Refine Datensatz ##################################
 #### Open Refine Datensatz
 joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
 glimpse(joined_oR)
@@ -288,7 +291,7 @@ ggsave("10_available_topics.jpeg", width = 297, height = 210, units = "mm")
 
 #joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
 #group_by(main.topic)%>%
-bestseller_topics <- joined_tbl %>%
+bestseller_topics <- joined_oR %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click),
             nBasket = sum(basket), 
@@ -298,15 +301,20 @@ bestseller_topics <- joined_tbl %>%
   print()
 
 ### Transaction Matrix erstellen
-iLabels <- itemLabels(joined_oR$itemID)
 
 
 
-transaction_frame <- joined_oR %>%
-  mutate(main.topic = as.factor(main.topic),
-         itemID = as.factor(itemID),
-         sessionID = as.factor(sessionID),
-         click = as.factor(click),
+trans_seq <- joined_oR %>%
+  group_by(sessionID) %>%
+  summarize(
+    SIZE = n()
+  )    
+trans_seq
+
+
+
+transaction_1 <- joined_oR %>%
+  mutate(click = as.factor(click),
          basket = as.factor(basket),
          order = as.factor(order),
          title = as.factor(title),
@@ -315,7 +323,6 @@ transaction_frame <- joined_oR %>%
          subtopics = as.factor(subtopics)) %>%
   as("transactions")
 
-trans <- as(joined_oR, "transactions")
 rules <- apriori(trans, parameter = list(minlen=2, supp=0.005, conf=0.8))
 inspect(rules)
 
