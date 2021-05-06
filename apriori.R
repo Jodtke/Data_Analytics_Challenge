@@ -38,13 +38,26 @@ head(oR_tbl, n = 10)
 joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
 glimpse(joined_oR)
 head(joined_oR, n = 20)
-## Reihenfolge der Spalten verändern
-joined_oR <- joined_oR[c(1,7:10,2:6)] 
+# Reihenfolge der Spalten verändern
+joined_oR <- joined_oR[, c(7,1,8:10,2:6) ]
+# Variablen rekodieren
 joined_oR <- joined_oR %>%
   mutate(main.topic = as.factor(main.topic),
          itemID = as.character(itemID),
-         sessionID = as.character(sessionID))
+         sessionID = as.integer(sessionID))
 head(joined_oR, n = 20)
+# Transaction-DataFrame erstellen
+transaction_frame <- joined_oR %>%
+  group_by(sessionID) %>% # Variablen asugerichtet nach der SessionID
+  arrange(sessionID) %>% # SessionID chronologisch von 0 - ENDE geordnet
+  # Summe der Clicks, Warenkörbe, Käufe, Anzahl der Items & zugehörige ItemID's zusammengefasst in Tibble speichern
+  summarize(nItems = n(), nClicks = sum(click), nBaskets = sum(basket), nOrders = sum(order),
+            items = paste(as.character(itemID), collapse = ","))
+transaction_frame <- data.frame(lapply(X = transaction_frame, FUN = as.factor)) # als DataFrame umwandeln und Variablen als Factor rekodieren
+head(transaction_frame, n = 20)
+# als Text-Datei speichern und als 'Transaction-Class' einlesen
+write.table(transaction_frame, "transactions.txt", sep=";", row.names = FALSE, col.names = FALSE, quote = FALSE)
+transactions_matrix <- read_baskets("transactions.txt", sep = ";", info = c("sessionID","nItems"))
 
 ## Split Sets
 # Beobachtungen extrahieren
