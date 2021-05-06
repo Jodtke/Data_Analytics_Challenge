@@ -299,35 +299,3 @@ bestseller_topics <- joined_oR %>%
             N = n()) %>%
   arrange(desc(nOrder)) %>%
   print()
-
-### Transaction Matrix erstellen
-
-
-
-trans_seq <- joined_oR %>%
-  group_by(sessionID) %>%
-  summarize(
-    SIZE = n()
-  )    
-trans_seq
-
-
-
-transaction_1 <- joined_oR %>%
-  mutate(click = as.factor(click),
-         basket = as.factor(basket),
-         order = as.factor(order),
-         title = as.factor(title),
-         author = as.factor(author),
-         publisher = as.factor(publisher),
-         subtopics = as.factor(subtopics)) %>%
-  as("transactions")
-
-rules <- apriori(trans, parameter = list(minlen=2, supp=0.005, conf=0.8))
-inspect(rules)
-
-rules.sorted <- sort(rules, by = "lift")
-inspect(rules.sorted)
-inspectDT(rules.sorted)
-plot(rules.sorted, method="grouped")
-#
