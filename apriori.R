@@ -59,7 +59,8 @@ head(transaction_frame, n = 20)
 write.table(transaction_frame, "transactions.txt", sep=";", row.names = FALSE, col.names = FALSE, quote = FALSE)
 transactions_matrix <- read_baskets("transactions.txt", sep = ";", info = c("sessionID","nItems"))
 
-## Split Sets
+
+## ROLF: Split Sets
 # Beobachtungen extrahieren
 itemMat_raw <- transactions_tbl%>%
   select(sessionID, itemID, order) %>% # nur drei essentielle Variablen: Session, Item & Kaufentscheidung
@@ -72,9 +73,6 @@ itemMat_raw <- itemMat_raw[,-1] # sessionID als Variable entfernen
 itemMat_raw <- as.matrix(itemMat_raw) # als Matrix umwandeln
 itemMatrix <- as(itemMat_raw, "itemMatrix")
 summary(itemMatrix)
-#size(itemMatrix)
-#itemInfo(itemMatrix)
-
 # Rules mit apriori definieren
 rules <- apriori(itemMatrix, parameter =  list(support = 0.00005, maxlen = 9, confidence = 0.5))
 # Rules untersuchen, grafisch & "normal"
@@ -87,30 +85,7 @@ oR_tbl %>% filter(itemID == 69073 | itemID == 27041)
 oR_tbl %>% filter(itemID == 4626 | itemID == 61335)
 
 
-### Transaction Matrix erstellen
-trans_seq <- joined_oR %>%
-  group_by(sessionID) %>%
-  summarize(
-    SIZE = n(),
-    itemID = as.character(itemID),
-    nOrder = sum(order),
-    nClick = sum(click)
-  )    
-trans_seq
-
-
-
-transaction_1 <- joined_oR %>%
-  mutate(click = as.factor(click),
-         basket = as.factor(basket),
-         order = as.factor(order),
-         title = as.factor(title),
-         author = as.factor(author),
-         publisher = as.factor(publisher),
-         subtopics = as.factor(subtopics)) %>%
-  as("transactions")
-arules::summary(transaction_1)
-
+### TEST: Transaction Matrix erste
 transaction_2 <- as(joined_oR, "transactions")
 rules2 <- apriori(transaction_2, parameter = list(minlen=2, support=0.005, confidence=0.8))
 arules::summary(rules2)
