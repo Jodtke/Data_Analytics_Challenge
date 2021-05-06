@@ -35,7 +35,7 @@ glimpse(oR_tbl)
 head(oR_tbl, n = 10)
 
 ## Joining
-joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
+joined_oR <- left_join(transactions_tbl, oR_tbl, by = "itemID")
 glimpse(joined_oR)
 head(joined_oR, n = 20)
 # Reihenfolge der Spalten verändern
@@ -56,8 +56,8 @@ transaction_frame <- joined_oR %>%
 transaction_frame <- data.frame(lapply(X = transaction_frame, FUN = as.factor)) # als DataFrame umwandeln und Variablen als Factor rekodieren
 head(transaction_frame, n = 20)
 # als Text-Datei speichern und als 'Transaction-Class' einlesen
-write.table(transaction_frame, "transactions.txt", sep=";", row.names = FALSE, col.names = FALSE, quote = FALSE)
-transactions_matrix <- read_baskets("transactions.txt", sep = ";", info = c("sessionID","nItems"))
+write.table(transaction_frame, "basket.txt", sep=";", row.names = FALSE, col.names = FALSE, quote = FALSE)
+transactions_matrix <- read_baskets("basket.txt", sep = ";", info = c("sessionID","nItems"))
 
 
 ## ROLF: Split Sets
