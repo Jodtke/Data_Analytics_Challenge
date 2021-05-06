@@ -299,4 +299,3 @@ bestseller_topics <- joined_oR %>%
             N = n()) %>%
   arrange(desc(nOrder)) %>%
   print()
-
