@@ -5,8 +5,6 @@
 ## Packages
 library(tidyverse)
 #library(janitor)
-#library(summarytools)
-#library(tmaptools)
 library(arules)
 library(arulesViz)
 library(arulesSequences)
@@ -35,7 +33,7 @@ glimpse(oR_tbl)
 head(oR_tbl, n = 10)
 
 ## Joining
-joined_oR <- left_join(transactions_tbl, oR_tbl, by = "itemID")
+joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
 glimpse(joined_oR)
 head(joined_oR, n = 20)
 # Reihenfolge der Spalten verändern
@@ -47,18 +45,21 @@ joined_oR <- joined_oR %>%
          sessionID = as.integer(sessionID))
 head(joined_oR, n = 20)
 # Transaction-DataFrame erstellen
-transaction_frame <- joined_oR %>%
+orders_data <- joined_oR %>%
   group_by(sessionID) %>% # Variablen asugerichtet nach der SessionID
   arrange(sessionID) %>% # SessionID chronologisch von 0 - ENDE geordnet
+  filter(order > 0) %>% # nur wenn min. 1 Kauf geschehen ist
   # Summe der Clicks, Warenkörbe, Käufe, Anzahl der Items & zugehörige ItemID's zusammengefasst in Tibble speichern
-  summarize(nItems = n(), nClicks = sum(click), nBaskets = sum(basket), nOrders = sum(order),
-            items = paste(as.character(itemID), collapse = ","))
-transaction_frame <- data.frame(lapply(X = transaction_frame, FUN = as.factor)) # als DataFrame umwandeln und Variablen als Factor rekodieren
-head(transaction_frame, n = 20)
+  summarize(nOrderedItems = n(), nOrders = sum(order),
+            items = paste(as.character(itemID), collapse = ",")) %>%
+  lapply(FUN = as.factor) %>% # alle Variablen als Faktor rekodieren & als Liste umwandeln
+  data.frame() # Datenstruktur in DF umwandeln
+head(orders_data, n = 20)
 # als Text-Datei speichern und als 'Transaction-Class' einlesen
-write.table(transaction_frame, "basket.txt", sep=";", row.names = FALSE, col.names = FALSE, quote = FALSE)
-transactions_matrix <- read_baskets("basket.txt", sep = ";", info = c("sessionID","nItems"))
-
+write.table(orders_data, "orders.txt", sep=";", row.names=FALSE, col.names=FALSE, quote=FALSE)
+orders_matrix <- read_baskets("orders.txt", sep=";", info = c("sessionID","nItems"))
+# # cspade anwenden (SPADE = "Sequential Pattern Discovery using Equivalence classes")
+# spade1 <- cspade(orders_matrix, parameter = list(support = 0.3), control = list(verbose = TRUE))
 
 ## ROLF: Split Sets
 # Beobachtungen extrahieren
