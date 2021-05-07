@@ -51,7 +51,7 @@ orders_data <- joined_oR %>%
   filter(order > 0) %>% # nur wenn min. 1 Kauf geschehen ist
   # Summe der Clicks, Warenkörbe, Käufe, Anzahl der Items & zugehörige ItemID's zusammengefasst in Tibble speichern
   summarize(nOrderedItems = n(), nOrders = sum(order),
-            items = paste(as.character(itemID), collapse = ",")) %>%
+            items = paste0(as.character(itemID), collapse = ",")) %>%
   lapply(FUN = as.factor) %>% # alle Variablen als Faktor rekodieren & als Liste umwandeln
   data.frame() # Datenstruktur in DF umwandeln
 head(orders_data, n = 20)
@@ -78,7 +78,7 @@ summary(itemMatrix)
 rules <- apriori(itemMatrix, parameter =  list(support = 0.00005, maxlen = 9, confidence = 0.5))
 # Rules untersuchen, grafisch & "normal"
 summary(rules)
-#plot(rules, method = "graph")
+plot(rules, method = "graph")
 inspect(head(sort(rules, by = "support"), n=10))
 # hochfrequente Items suchen
 oR_tbl %>% filter(itemID == 14093 | itemID == 47221)
