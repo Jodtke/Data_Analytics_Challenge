@@ -4,77 +4,136 @@
 
 ## Packages
 library(tidyverse)
-library(summarytools)
-
+#library(janitor)
+#library(summarytools)
+#library(tmaptools)
+library(arules)
+library(arulesViz)
 
 ## Arbeitsverzeichnis
 getwd()
 
 ## Daten
-items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-dim(items_raw)    #78 334 x 6
+#items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+#dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
+openRefine <- read.csv(file = "./Data/oR_items.csv", header = T, sep = ";", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+dim(openRefine)
 
 openRefine <- read.csv(file = "C:/Users/Liulia/Documents/R/oR_items.csv", header = T, sep = ";", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
 
 
 
 # als Tibble kovertieren
-items_tbl <- as_tibble(items_raw)
+# items_tbl <- as_tibble(items_raw)
+# glimpse(items_tbl)
+# head(items_tbl, n = 20)
 transactions_tbl <- as_tibble(transactions_raw)
+<<<<<<< HEAD
 openRefin_tbl <- as_tibble(openRefine)
 ###### Datenexploration ######
 # Items
 glimpse(items_tbl)
 head(items_tbl, n = 20)
 items_tbl %>% 
+=======
+glimpse(transactions_tbl)
+head(transactions_tbl, n = 10)
+# bereinigter Datensatz aus Open Refine
+oR_tbl <- as_tibble(openRefine)
+glimpse(oR_tbl)
+head(oR_tbl, n = 10)
+
+################################## Datenexploration ###########################################
+### Items
+## Häufigste Buchtitel im Handel
+# items_tbl %>% 
+#   select(itemID, title, author, publisher) %>%
+#   group_by(title) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Autoren im Handel
+# items_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(author) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Verlage im Handel
+# items_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(publisher) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Kombination aus Autor & Buchtitel
+# items_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(author, title) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Kombination aus Autor & Verlag
+# items_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(author, publisher) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+
+### Items (open refine)
+## Häufigste Buchtitel im Handel
+oR_tbl %>% 
+>>>>>>> 896423cc0f7fd3a62b509f37bcda6283b8abee13
   select(itemID, title, author, publisher) %>%
   group_by(title) %>%
   summarise(N = n()) %>%
-  arrange(desc(N)) ####### nach title
-
-items_tbl %>%
+  arrange(desc(N))
+## Häufigste Autoren im Handel
+oR_tbl %>%
   select(itemID, title, author, publisher) %>%
   group_by(author) %>%
   summarise(N = n()) %>%
-  arrange(desc(N)) ###### nach author
-items_tbl %>%
+  arrange(desc(N))
+## Häufigste Verlage im Handel
+oR_tbl %>%
   select(itemID, title, author, publisher) %>%
   group_by(publisher) %>%
   summarise(N = n()) %>%
-  arrange(desc(N)) ###### nach publisher
-items_tbl %>%
+  arrange(desc(N))
+## Häufigste Kombination aus Autor & Buchtitel
+oR_tbl %>%
   select(itemID, title, author, publisher) %>%
   group_by(author, title) %>%
   summarise(N = n()) %>%
-  arrange(desc(N)) ##### nach author & title
-items_tbl %>%
+  arrange(desc(N))
+## Häufigste Kombination aus Autor & Verlag
+oR_tbl %>%
   select(itemID, title, author, publisher) %>%
   group_by(author, publisher) %>%
   summarise(N = n()) %>%
-  arrange(desc(N)) ##### nach author & publisher
+  arrange(desc(N))
 
-# Transactions
-glimpse(transactions_tbl)
-head(transactions_tbl, n = 20)
+### Transactions
+## Häufigste Clicks einer itemID
 transactions_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
   arrange(desc(nClick))
+## Häufigste Warenkörbe einer itemID
 transactions_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
   arrange(desc(nBasket))
+## Häufigste Käufe einer itemID
 transactions_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
   arrange(desc(nOrder))
+## am Häufigsten auftretende itemID in SessionID (allgemein)
 transactions_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
   arrange(desc(N))
 
+<<<<<<< HEAD
 ## summarytools
 # Items
 summarytools::dfSummary(items_tbl)
@@ -87,53 +146,148 @@ summarytools::freq(transactions_tbl$click)
 summarytools::freq(transactions_tbl$basket)
 summarytools::freq(transactions_tbl$order)
 summarytools::view(descr(transactions_tbl))
+=======
+# summarytools::freq(transactions_tbl$click)
+# summarytools::freq(transactions_tbl$basket)
+# summarytools::freq(transactions_tbl$order)
+#summarytools::view(descr(transactions_tbl))
+>>>>>>> 896423cc0f7fd3a62b509f37bcda6283b8abee13
 
-#Merge Datasets mit alle sessionIDs
-length(unique(items_tbl$itemID))
+# einzigartige itemID's
+#length(unique(items_tbl$itemID))
 length(unique(transactions_tbl$itemID))
-joined_tbl <- left_join(items_tbl,transactions_tbl, by = "itemID") #418 568 x 10
+length(unique(oR_tbl$itemID))
 
+length(unique(transactions_tbl$sessionID)) # einzigartige sessions 271 983 
+## nur doppelte sessions
+transactions_tbl[transactions_tbl$sessionID %in%
+                   transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
+
+#################################### Joining ###################################################
+# #### items Datensatz ()
+# joined_tbl <- left_join(items_tbl,transactions_tbl, by = "itemID") #418 568 x 10
+# glimpse(joined_tbl)
+# head(joined_tbl, n = 20)
+# # Reihenfolge der Spalten verändern
+# joined_tbl <- joined_tbl[c(1,7:10,2:6)] 
+# joined_tbl <- joined_tbl %>% mutate(main.topic = as.factor(main.topic))
+# head(joined_tbl, n = 20)
+# # wie oft jeder main.topic im Laden vorkommt
+# count_maintopics <- count(items_tbl, main.topic) %>% arrange(desc(n))
+# head(count_maintopics, n = 20) 
+### Bar plot with 10 main topics in the book shop
+# g_by_topic <- items_tbl %>% 
+#   select(itemID, main.topic) %>%
+#   group_by(main.topic) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N)) ####### nach topic
+# main_topics <- g_by_topic[1:10,]
+# main_topics
+# 
+# #tmaptools::palette_explorer() 
+# my_palette <- c("#61BB6D","#7CC77A","#C3E698", 
+#                 "#DBF0A4", "#E9F6AF", "#F7FCBA",
+#                 "#FBFDCF", "#FFFFE5", "#95D284",
+#                 "#AEDD8E")
+# main_topics <- main_topics %>%
+#   mutate(lbls = c("FM"="Fantasy literature", 
+#                   "YFB" = "Children’s and teenage: contemporary literature",
+#                   "FL" = "Science-Fiction",
+#                   "YFH" = "Children’s and teenage: fantasy and magical realism ",
+#                   "YFC" = "Children’s and teenage: action and adventure",
+#                   "YF" = "Children’s and teenage: fiction and true stories",
+#                   "YBG" = "Learning material: interactive and activity books",
+#                   "FMB" = "Fiction and related items",
+#                   "YFCF" = "Children’s: crime and mystery fiction",
+#                   "YFJ" = "Children’s: traditional stories"))
+# # main_topics
+# g <- ggplot(data = main_topics, mapping = aes(x = reorder(main.topic, desc(N)), y = N, fill = my_palette))
+# g + geom_col(fill = my_palette) +
+#   geom_text(data = main_topics, aes(x=main.topic, y=100, label = lbls, hjust=0, angle=90)) +
+#   ggtitle("10 best Bookstore available topics") +
+#   theme(plot.title = element_text(size = 25),
+#         axis.title.x = element_text(size = 16),
+#         axis.title.y = element_text(size = 16)) +
+#   xlab("Topic Entcoding acc. BIC(Book Industry Communications)") +
+#   ylab("Frequency")
+# jpeg(file = "10_available_topics.jpeg")
+# ggsave("10_available_topics.jpeg", width = 297, height = 210, units = "mm")
+# 
+# ####HEATMAPE with 10 main best sell topics 
+# 
+# #joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
+# #group_by(main.topic)%>%
+# bestseller_topics <- joined_tbl %>%
+#   group_by(itemID) %>%
+#   summarise(nClick = sum(click),
+#             nBasket = sum(basket), 
+#             nOrder = sum(order), 
+#             N = n()) %>%
+#   arrange(desc(nOrder)) %>%
+#   print()
+
+<<<<<<< HEAD
 #reifolge der Spalten verändern
 joined_tbl <- joined_tbl[c(1,7:10,2:6)] 
 joined_tbl <- joined_tbl %>% mutate(main.topic = as.factor(main.topic))
 joined_tbl %>% arrange(itemID)
+=======
+>>>>>>> 896423cc0f7fd3a62b509f37bcda6283b8abee13
 
-#wie oft jeder main.topic im Laden vorkommt
-count_maintopics <- count(items_tbl, main.topic) %>% arrange(desc(n))
-count_maintopics
+############################## Joining - Open Refine Datensatz ##################################
+#### Open Refine Datensatz
+joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
+glimpse(joined_oR)
+head(joined_oR, n = 20)
+# Reihenfolge der Spalten verändern
+joined_oR <- joined_oR[c(1,7:10,2:6)] 
+joined_oR <- joined_oR %>%
+  mutate(main.topic = as.factor(main.topic),
+         itemID = as.character(itemID),
+         sessionID = as.character(sessionID))
+head(joined_oR, n = 20)
+
+# wie oft jeder main.topic im Laden vorkommt
+count_maintopics <- count(joined_oR, main.topic) %>% arrange(desc(n))
+head(count_maintopics, n = 20) 
+
+# grafischer Überblick
 ggplot(count_maintopics) + geom_histogram(aes(x=n))
+# über 500 Vorkommen
 count_maintopics %>% filter(n > 500)   #33 Themen am meinsten vorhanden
+# grafischer Überblick
 ggplot(count_maintopics) + geom_histogram(aes(x=n), breaks = seq(0,500,25))
 ggplot(count_maintopics) + geom_histogram(aes(x=n), breaks = seq(0,100,25))
+# Themen die weniger als 25 mal vorkommen
 count_maintopics %>% filter(n < 25)    #540/700 Themen kommen ganz selten vor
 #dementsprechend müssen sie gruppiert werden auf der Phase feature engineering
 
+<<<<<<< HEAD
 
 
+=======
+############################ Aufbereitung: Genres & Subgenres #################################
+### Top-Themen im Laden 
+# FM Fantasyliteratur
+# YFB Kinder/Jugendliche: Gegenwartsliteratur
+# FL Science-Fiction
+# YFH Kinder/Jugendliche: Fantasy
+# YFC Kinder/Jugendliche: Action- und Abenteuergeschichten
+>>>>>>> 896423cc0f7fd3a62b509f37bcda6283b8abee13
 
 #main_topics,an die Kunden am meisten Interesse haben
-joined_tbl %>% group_by(main.topic) %>% count(main.topic) %>% arrange(desc(n))
+joined_oR %>% group_by(main.topic) %>% count(main.topic) %>% arrange(desc(n))
 
-########################
-#Top Themen an die Kunden Interesse haben 
+### Top Themen an die Kunden Interesse haben 
+# FMB  Fantasy
+# YFH  Fantasy and magical realism (Children’s/Teenage)
+# YBG Interactive and activity books and packs…
+# FM Fantasyliteratur
+# YFHR Fantasy romance (Teenage)
 
-#FMB  Fantasy
-#YFH  Fantasy and magical realism (Children’s/Teenage)
-#YBG Interactive and activity books and packs…
-#FM Fantasyliteratur
-#YFHR Fantasy romance (Teenage)
-
-length(unique(transactions_tbl$sessionID)) # unique sessions 271 983 
-##nur duplicated sessions
-transactions_tbl[transactions_tbl$sessionID %in% 
-               transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
-
-
-################visualisation##########
-#######################################
-#bar plot with 10 main topics in the book shop
-library(tmaptools)
-g_by_topic <- items_tbl %>% 
+##################################### Visualisierung ##########################################
+### Bar plot with 10 main topics in the book shop
+g_by_topic <- oR_tbl %>% 
   select(itemID, main.topic) %>%
   group_by(main.topic) %>%
   summarise(N = n()) %>%
@@ -142,6 +296,7 @@ main_topics <- g_by_topic[1:10,]
 main_topics
 
 #tmaptools::palette_explorer() 
+<<<<<<< HEAD
 my_palette <-  c("#61BB6D","#7CC77A","#95D284",
                  "#AEDD8E", "#C3E698", "#DBF0A4", "#E9F6AF", "#F7FCBA",
                  "#FBFDCF", "#FFFFE5")
@@ -162,6 +317,28 @@ g <- ggplot(data = main_topics, mapping = aes(y = reorder(main.topic, N), x = N,
 g + geom_col(fill = my_palette) +
   geom_text(data = main_topics, aes(y=main.topic, x=100, label = lbls, hjust=0), size = 5)+
     ggtitle("10 best Bookstore available topics") +
+=======
+my_palette <- c("#61BB6D","#7CC77A","#C3E698", 
+                "#DBF0A4", "#E9F6AF", "#F7FCBA",
+                "#FBFDCF", "#FFFFE5", "#95D284",
+                "#AEDD8E")
+main_topics <- main_topics %>%
+  mutate(lbls = c("FM"="Fantasy literature", 
+                  "YFB" = "Children’s and teenage: contemporary literature",
+                  "FL" = "Science-Fiction",
+                  "YFH" = "Children’s and teenage: fantasy and magical realism ",
+                  "YFC" = "Children’s and teenage: action and adventure",
+                  "YF" = "Children’s and teenage: fiction and true stories",
+                  "YBG" = "Learning material: interactive and activity books",
+                  "FMB" = "Fiction and related items",
+                  "YFCF" = "Children’s: crime and mystery fiction",
+                  "YFJ" = "Children’s: traditional stories"))
+# main_topics
+g <- ggplot(data = main_topics, mapping = aes(x = reorder(main.topic, desc(N)), y = N, fill = my_palette))
+g + geom_col(fill = my_palette) +
+  geom_text(data = main_topics, aes(x=main.topic, y=100, label = lbls, hjust=0, angle=90)) +
+  ggtitle("10 best Bookstore available topics") +
+>>>>>>> 896423cc0f7fd3a62b509f37bcda6283b8abee13
   theme(plot.title = element_text(size = 25),
         axis.title.x = element_text(size = 16),
         axis.title.y = element_text(size = 16)) +
@@ -170,6 +347,7 @@ g + geom_col(fill = my_palette) +
 #file = "10_available_topics.jpeg")
 ggsave("10_available_topics.jpeg", width = 297, height = 210, units = "mm")
 
+<<<<<<< HEAD
 ###############################################################################
 ###############################################################################
 ##bar plot bestseller topics in the shop####
@@ -301,3 +479,52 @@ expl_basket <-  filter(joined_tbl, basket %in% c(293,287,268,182,150,119))
 expl_order <- filter(joined_tbl, order %in% c(28,27,26,25,23,21))
 ggplot(transactions_tbl) + geom_col(aes(x = itemID,  y = click))
 length(transactions_tbl$click)
+=======
+#### HEATMAP with 10 main best sell topics 
+
+
+
+
+#joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
+#group_by(main.topic)%>%
+bestseller_topics <- joined_oR %>%
+  group_by(itemID) %>%
+  summarise(nClick = sum(click),
+            nBasket = sum(basket), 
+            nOrder = sum(order), 
+            N = n()) %>%
+  arrange(desc(nOrder)) %>%
+  print()
+
+### Transaction Matrix erstellen
+
+
+
+trans_seq <- joined_oR %>%
+  group_by(sessionID) %>%
+  summarize(
+    SIZE = n()
+  )    
+trans_seq
+
+
+
+transaction_1 <- joined_oR %>%
+  mutate(click = as.factor(click),
+         basket = as.factor(basket),
+         order = as.factor(order),
+         title = as.factor(title),
+         author = as.factor(author),
+         publisher = as.factor(publisher),
+         subtopics = as.factor(subtopics)) %>%
+  as("transactions")
+
+rules <- apriori(trans, parameter = list(minlen=2, supp=0.005, conf=0.8))
+inspect(rules)
+
+rules.sorted <- sort(rules, by = "lift")
+inspect(rules.sorted)
+inspectDT(rules.sorted)
+plot(rules.sorted, method="grouped")
+#
+>>>>>>> 896423cc0f7fd3a62b509f37bcda6283b8abee13
