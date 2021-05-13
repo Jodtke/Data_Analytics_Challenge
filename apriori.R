@@ -15,11 +15,11 @@ getwd()
 ## Daten
 #items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 #dim(items_raw)    #78 334 x 6
-transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
-dim(openRefine)
-
+# transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+# dim(transactions_raw)  #365 143 x 5
+# openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+# dim(openRefine)
+joined_oR <- read.csv(file="joined_trans_items.csv", header=T, sep=",", dec=".", quote="", row.names=NULL, stringsAsFactors=F, encoding="UTF-8")
 ## als Tibble kovertieren
 #items_tbl <- as_tibble(items_raw)
 # glimpse(items_tbl)
