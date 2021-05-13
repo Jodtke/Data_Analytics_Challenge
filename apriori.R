@@ -17,7 +17,7 @@ getwd()
 #dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/oR_items.csv", header = T, sep = ";", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
 dim(openRefine)
 
 ## als Tibble kovertieren
@@ -64,7 +64,7 @@ orders_matrix <- read_baskets("orders.txt", sep=";", info = c("sessionID","nItem
 ## ROLF: Split Sets
 # Beobachtungen extrahieren
 itemMat_raw <- transactions_tbl%>%
-  select(sessionID, itemID, order) %>% # nur drei essentielle Variablen: Session, Item & Kaufentscheidung
+  select(sessionID, itemID, order, author) %>% # nur drei essentielle Variablen: Session, Item & Kaufentscheidung
   head(n=36500) %>% # erste 36500 Beobachtungen
   spread(key = itemID, value = order)
 # Zelleneinträge binär kodieren & Item-Matrix entwerfen
@@ -75,7 +75,7 @@ itemMat_raw <- as.matrix(itemMat_raw) # als Matrix umwandeln
 itemMatrix <- as(itemMat_raw, "itemMatrix")
 summary(itemMatrix)
 # Rules mit apriori definieren
-rules <- apriori(itemMatrix, parameter =  list(support = 0.00005, maxlen = 9, confidence = 0.5))
+rules <- apriori(itemMatrix, parameter =  list(support = 0.00005, maxlen = 2, confidence = 0.5))
 # Rules untersuchen, grafisch & "normal"
 summary(rules)
 plot(rules, method = "graph")
@@ -91,7 +91,7 @@ transaction_2 <- as(joined_oR, "transactions")
 rules2 <- apriori(transaction_2, parameter = list(minlen=2, support=0.005, confidence=0.8))
 arules::summary(rules2)
 inspect(head(sort(rules2, by="lift"), n = 10))
-
+plot(rules2, method="graph")
 
 
 
