@@ -18,7 +18,7 @@ getwd()
 #dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/oR_items.csv", header = T, sep = ";", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
 dim(openRefine)
 
 # als Tibble kovertieren
@@ -119,11 +119,6 @@ transactions_tbl %>%
   group_by(itemID) %>%
   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
   arrange(desc(N))
-
-# summarytools::freq(transactions_tbl$click)
-# summarytools::freq(transactions_tbl$basket)
-# summarytools::freq(transactions_tbl$order)
-#summarytools::view(descr(transactions_tbl))
 
 # einzigartige itemID's
 #length(unique(items_tbl$itemID))
@@ -358,7 +353,7 @@ ggplot(bestseller_topics, aes(x= Transaction, y= main.topic, fill = Amount))+ ge
 
 ################################################################################
 ################################################################################
-log_scala_heat_mape <- bestseller_topics %>% mutate(Amount= sapply(Amount, function(x) x/10))
+log_scala_heat_mape <- bestseller_topics %>% mutate(Amount = sapply(Amount, function(x) x/10))
 ggplot(log_scala_heat_mape, aes(x= Transaction, y= main.topic, fill = Amount))+
   geom_tile()+scale_fill_gradient(low="blue", high="red")+
   ylab("Most intresting topics") +
@@ -417,46 +412,6 @@ ggplot(transactions_tbl) + geom_col(aes(x = itemID,  y = click))
 length(transactions_tbl$click)
 
 
-#### HEATMAP with 10 main best sell topics 
-
-#joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
-#group_by(main.topic)%>%
-bestseller_topics <- joined_oR %>%
-  group_by(itemID) %>%
-  summarise(nClick = sum(click),
-            nBasket = sum(basket), 
-            nOrder = sum(order), 
-            N = n()) %>%
-  arrange(desc(nOrder)) %>%
-  print()
-
-### Transaction Matrix erstellen
 
 
 
-trans_seq <- joined_oR %>%
-  group_by(sessionID) %>%
-  summarize(
-    SIZE = n()
-  )    
-trans_seq
-
-
-
-transaction_1 <- joined_oR %>%
-  mutate(click = as.factor(click),
-         basket = as.factor(basket),
-         order = as.factor(order),
-         title = as.factor(title),
-         author = as.factor(author),
-         publisher = as.factor(publisher),
-         subtopics = as.factor(subtopics)) %>%
-  as("transactions")
-
-rules <- apriori(trans, parameter = list(minlen=2, supp=0.005, conf=0.8))
-inspect(rules)
-
-rules.sorted <- sort(rules, by = "lift")
-inspect(rules.sorted)
-inspectDT(rules.sorted)
-plot(rules.sorted, method="grouped")
