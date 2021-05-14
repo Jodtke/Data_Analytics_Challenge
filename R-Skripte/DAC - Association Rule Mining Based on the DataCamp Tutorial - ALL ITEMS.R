@@ -119,7 +119,7 @@ testSet <- evaluation %>%
   select(title)
 
 #testSet <- apply(head(testSet,3),1, as.character)
-testSet <- as.character(testSet[1])
+testSet <- as.character(head(testSet,1))
 
 target.association.rules <- apriori(tr, parameter = list(supp = 0.001, conf = 0.8), appearance = list(default="lhs",rhs=testSet))
 # Here lhs=METAL because you want to find out the probability of that in how many customers buy METAL along with other items
