@@ -27,7 +27,7 @@ transactions <- transactions[complete.cases(transactions), ]
 tranasctions <- transactions %>% mutate(itemID = as.factor(itemID))
 
 # read items into R dataframe
-items <- read_delim("items.csv", delim = "|")
+items <- read_delim("./Data/items.csv", delim = "|")
 sum(is.na(items$`main topic`))
 # join transactions and items together
 complete <- left_join(transactions, items, by = "itemID")
@@ -110,7 +110,7 @@ subset.association.rules. <- association.rules[-subset.rules] # remove subset ru
 # Finding Rules related to given items
 
 # load the data set with the target items
-evaluation <- read.csv("evaluation.csv")
+evaluation <- read.csv("./Data/evaluation.csv")
 testSet <- evaluation %>%
   inner_join(items, by = "itemID") %>% 
   select(title)
@@ -185,10 +185,10 @@ transactionData
 # This format for transaction data is called the basket format. 
 # Next, you have to store this transaction data into a .csv (Comma Separated Values) file. 
 # For this, write.csv()
-write.csv(transactionData, "DAC_transactions.csv", quote = FALSE, row.names = FALSE)
+write.csv(transactionData, "actual_transactions.csv", quote = FALSE, row.names = FALSE)
 
 # Next, you have to load this transaction data into an object of the transaction class.
-tr <- read.transactions("DAC_transactions.csv", format = "basket", sep = "|")
+tr <- read.transactions("actual_transactions.csv", format = "basket", sep = "|")
 # m?ssen hier bei sep das "|" Symbol verwenden, da wir diese weiter oben auch so getrennt haben!
 
 summary(tr)
