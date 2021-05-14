@@ -15,11 +15,14 @@ getwd()
 ## Daten
 #items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 #dim(items_raw)    #78 334 x 6
-# transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-# dim(transactions_raw)  #365 143 x 5
-# openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
-# dim(openRefine)
-joined_oR <- read.csv(file="joined_trans_items.csv", header=T, sep=",", dec=".", quote="", row.names=NULL, stringsAsFactors=F, encoding="UTF-8")
+transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
+dim(transactions_raw)  #365 143 x 5
+openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+dim(openRefine)
+# joined_oR <- read.csv(file="./Data/joined_trans_items.csv", header=T, sep=",", dec=".", quote="", row.names=NULL, stringsAsFactors=F, encoding="UTF-8")
+# joined_oR <- as_tibble(joined_oR)
+# glimpse(joined_oR)
+# head(joined_oR, n=10)
 ## als Tibble kovertieren
 #items_tbl <- as_tibble(items_raw)
 # glimpse(items_tbl)
@@ -36,30 +39,34 @@ head(oR_tbl, n = 10)
 joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
 glimpse(joined_oR)
 head(joined_oR, n = 20)
-# Reihenfolge der Spalten verändern
+
+## Reihenfolge der Spalten verändern
 joined_oR <- joined_oR[, c(7,1,8:10,2:6) ]
-# Variablen rekodieren
-joined_oR <- joined_oR %>%
-  mutate(main.topic = as.factor(main.topic),
-         itemID = as.character(itemID),
-         sessionID = as.integer(sessionID))
-head(joined_oR, n = 20)
-# Transaction-DataFrame erstellen
+head(joined_oR, n=10)
+
+## Variablen rekodieren
+ joined_oR <- joined_oR %>%
+   mutate(main.topic = as.factor(main.topic),
+          itemID = as.character(itemID),
+          sessionID = as.integer(sessionID))
+ head(joined_oR, n = 20)
+
+## Transaction-DataFrame erstellen
 orders_data <- joined_oR %>%
   group_by(sessionID) %>% # Variablen asugerichtet nach der SessionID
   arrange(sessionID) %>% # SessionID chronologisch von 0 - ENDE geordnet
   filter(order > 0) %>% # nur wenn min. 1 Kauf geschehen ist
   # Summe der Clicks, Warenkörbe, Käufe, Anzahl der Items & zugehörige ItemID's zusammengefasst in Tibble speichern
   summarize(nOrderedItems = n(), nOrders = sum(order),
-            items = paste0(as.character(itemID), collapse = ",")) %>%
+            items = paste0(as.character(itemID), collapse = ","),
+            authors = paste0(as.character(author), collapse = ","),
+            mainTopics = paste0(as.character(main.topic), collapse = ",")) %>%
   lapply(FUN = as.factor) %>% # alle Variablen als Faktor rekodieren & als Liste umwandeln
   data.frame() # Datenstruktur in DF umwandeln
 head(orders_data, n = 20)
 # als Text-Datei speichern und als 'Transaction-Class' einlesen
 write.table(orders_data, "orders.txt", sep=";", row.names=FALSE, col.names=FALSE, quote=FALSE)
-orders_matrix <- read_baskets("orders.txt", sep=";", info = c("sessionID","nItems"))
-# # cspade anwenden (SPADE = "Sequential Pattern Discovery using Equivalence classes")
-# spade1 <- cspade(orders_matrix, parameter = list(support = 0.3), control = list(verbose = TRUE))
+orders_matrix <- read_baskets("orders.txt", sep=";", info = c("sessionID","nOrderedItems", "nOrders", "items", "authors", "mainTopics"))
 
 ## ROLF: Split Sets
 # Beobachtungen extrahieren
