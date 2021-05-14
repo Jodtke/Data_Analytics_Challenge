@@ -100,5 +100,5 @@ arules::summary(rules2)
 inspect(head(sort(rules2, by="lift"), n = 10))
 plot(rules2, method="graph")
 
-
+hallo <- "servus"
 
