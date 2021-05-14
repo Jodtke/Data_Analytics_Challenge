@@ -1,6 +1,6 @@
 ############ Data Mining Cup ##########
 
-### Apriori
+### Recommender-System (hybrid)
 
 ## Packages
 library(tidyverse)
