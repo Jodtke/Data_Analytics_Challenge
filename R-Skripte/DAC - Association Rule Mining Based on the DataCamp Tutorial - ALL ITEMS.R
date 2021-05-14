@@ -52,7 +52,7 @@ library(plyr)
 #ddply(dataframe, variables_to_be_used_to_split_data_frame, function_to_be_applied)
 transactionData <- ddply(complete, "sessionID",
                          function(df1)paste(df1$title,
-                                            collapse = "|"))
+                                            collapse = ";"))
 
 
 # Problem: Es gibt viele B?cher, hinter denen ", Band 1" steht. Folglich w?rde ", Band 1" als eigenes Item betrachtet werden.
@@ -72,7 +72,7 @@ View(transactionData)
 write.csv(transactionData, "full_join_transactions.csv", quote = FALSE, row.names = FALSE)
 
 # Next, you have to load this transaction data into an object of the transaction class.
-tr <- read.transactions("full_join_transactions.csv", format = "basket", sep = "|")
+tr <- read.transactions("full_join_transactions.csv", format = "basket", sep = ";")
 # m?ssen hier bei sep das "|" Symbol verwenden, da wir diese weiter oben auch so getrennt haben!
 
 summary(tr)
@@ -126,8 +126,9 @@ target.association.rules <- apriori(tr, parameter = list(supp = 0.001, conf = 0.
 inspect(head(target.association.rules))
 
 # Similarly, to find the answer to the question Customers who bought METAL also bought.... you will keep METAL on lhs:
-target.association.rules <- apriori(tr, parameter = list(supp=0.00001, conf=0.2),appearance = list(lhs="Breathtaking",default="rhs"))
-inspect(target.association.rules)
+target.association.rules <- apriori(tr, parameter = list(supp=0.000001, conf=0.2),appearance = list(lhs="Breathtaking",default="rhs"))
+summary(target.association.rules)
+inspect(target.association.rules[1:10])
 
 # Visualizing Association Rules
 
