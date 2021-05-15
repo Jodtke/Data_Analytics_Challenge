@@ -62,7 +62,7 @@ transactionData$sessionID <- NULL
 #Rename column to items
 colnames(transactionData) <- c("items")
 #Show Dataframe transactionData
-View(transactionData)
+#View(transactionData)
 
 # This format for transaction data is called the basket format. 
 # Next, you have to store this transaction data into a .csv (Comma Separated Values) file. 
@@ -98,8 +98,9 @@ inspect(association.rules[1:10])
 # Limiting the number and size of rules
 
 # If you want stronger rules, you can increase the value of conf and for more extended rules give higher value to maxlen.
-shorter.association.rules <- apriori(tr, parameter = list(supp=0.001, conf=0.8,maxlen=3))
-
+shorter.association.rules <- apriori(tr, parameter = list(supp=0.0001, conf=0.8,maxlen=3))
+summary(shorter.association.rules)
+inspect(shorter.association.rules[1:10])
 # Removing redundant rules
 
 # You can remove rules that are subsets of larger rules.
@@ -112,18 +113,30 @@ subset.association.rules. <- association.rules[-subset.rules] # remove subset ru
 # load the data set with the target items
 evaluation <- read.csv("./Data/evaluation.csv")
 testSet <- evaluation %>%
-  inner_join(items, by = "itemID") %>% 
+  inner_join(items, by = "itemID") 
+testSet <- testSet %>% 
+  inner_join(complete) %>% 
   select(title)
 
+testSet <- unique(testSet)
+
 #testSet <- apply(head(testSet,3),1, as.character)
-testSet <- as.character(testSet[1])
+testSet <- head(testSet,2)
 
 target.association.rules <- apriori(tr, parameter = list(supp = 0.001, conf = 0.8), appearance = list(default="lhs",rhs=testSet))
 # Here lhs=METAL because you want to find out the probability of that in how many customers buy METAL along with other items
 inspect(head(target.association.rules))
 
 # Similarly, to find the answer to the question Customers who bought METAL also bought.... you will keep METAL on lhs:
-target.association.rules <- apriori(tr, parameter = list(supp=0.00001, conf=0.2),appearance = list(lhs=testSet,default="rhs"))
+target.association.rules <- apriori(tr, parameter = list(supp=0.00001, conf=0.2),appearance = list(lhs=c("Vampire Academy 04", "The Elite"),default="rhs"))
+summary(target.association.rules)
+inspect(target.association.rules)
+
+# Problem: Offenbar lassen sich für manche Items nicht einmal 5 Regeln finden
+
+# Similarly, to find the answer to the question Customers who bought METAL also bought.... you will keep METAL on lhs:
+target.association.rules <- apriori(tr, parameter = list(supp=0.00001, conf=0.2),appearance = list(lhs=testSet, default="rhs"))
+summary(target.association.rules)
 inspect(target.association.rules)
 
 # Visualizing Association Rules
