@@ -36,18 +36,46 @@ head(joined_oR, n=20)
 joined_oR <- joined_oR[, c(7,1,8:10,2:6) ]
 head(joined_oR, n=10)
 
-## Variablen rekodieren in Factor
-joined_oR <- as_tibble(lapply(joined_oR, factor))
-head(joined_oR, n=20)
-# an 'numerische' Factors den Zusatz 'ID' hängen, damit später keine Probleme auftreten
-joined_oR$sessionID <- as.factor(paste0("SID.", joined_oR$sessionID))
-joined_oR$itemID <- as.factor(paste0("IID.", joined_oR$itemID))
-head(joined_oR, n=20)
+## durchschnittliche Click-Order-Ratio pro Item berechnen
+joined_oR$click_order_ratio <- joined_oR$click / joined_oR$order
+joined_oR$click_order_ratio <- sapply(joined_oR$click_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
+## durchschnittliche Basket-Order-Ration pro Item berechnen
+joined_oR$basket_order_ratio <- joined_oR$basket / joined_oR$order
+joined_oR$basket_order_ratio <- sapply(joined_oR$basket_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
+## neues Tibble --> nach itemID zusammengefasste Werte!
+tibble_with_ratios <- joined_oR %>%
+  group_by(itemID) %>%
+  summarise(
+    author = author,
+    publisher = publisher,
+    main_topic = main.topic,
+    sum_clicks = sum(click),
+    sum_basket = sum(basket),
+    sum_order = sum(order),
+    mean_click_order_ratio = mean(click_order_ratio),
+    mean_basket_order_ratio = mean(basket_order_ratio)
+  ) %>%
+  distinct(.keep_all = T) %>%
+  lapply(factor) %>%
+  data.frame()
+# Übersicht
+summary(tibble_with_ratios)
+glimpse(tibble_with_ratios)
+head(tibble_with_ratios, n=20)
 
-# NA-Daten von click, basket und order rasuwerfen
-joined_tbl_onlyOrders <- joined_oR %>%
-  filter(!is.na(order) & order != 0)
-head(joined_tbl_onlyOrders, n=20) # ca 50.000 Zeilen entfernt & etwa 365.000 Zeilen verbleiben
+## Variablen rekodieren in Factor
+# joined_oR <- as_tibble(lapply(joined_oR, factor))
+# head(joined_oR, n=20)
+
+## an 'numerischen' Factor itemID den Zusatz 'IID' hängen, damit später keine Probleme auftreten beim umwandeln in Zeilen-und Spaltennamen der Matrix
+# joined_oR$sessionID <- as.factor(paste0("SID.", joined_oR$sessionID))
+tibble_with_ratios$itemID <- as.factor(paste0("IID.", tibble_with_ratios$itemID))
+head(tibble_with_ratios, n=20)
+
+## NA-Daten von click, basket und order rasuwerfen
+# joined_tbl_onlyOrders <- joined_oR %>%
+#   filter(!is.na(order) & order != 0)
+# head(joined_tbl_onlyOrders, n=20) # ca 50.000 Zeilen entfernt & etwa 365.000 Zeilen verbleiben
 
 ########### Daten inspizieren #############
 # # Plot: meiste Autoren
@@ -59,8 +87,8 @@ head(joined_tbl_onlyOrders, n=20) # ca 50.000 Zeilen entfernt & etwa 365.000 Zei
 #   geom_col() +
 #   theme_minimal()
 # 
-# # Plot: meiste Titel
-# joined_tbl_onlyOrders %>%
+# Plot: meiste Titel
+# tibble_with_ratios %>%
 #   group_by(title) %>%
 #   summarise(nOrders = sum(as.integer(order), na.rm = T)) %>%
 #   filter(nOrders >= 150) %>%
@@ -68,23 +96,18 @@ head(joined_tbl_onlyOrders, n=20) # ca 50.000 Zeilen entfernt & etwa 365.000 Zei
 #   geom_col() +
 #   theme_minimal()
 
-# Zusammenfassung für gekaufte Buchtitel
-items_used <- joined_tbl_onlyOrders %>%
-  group_by(title) %>%
-  count()
-summary(items_used$n) # Median nur bei "1" (ItemID) nur einmal vertreten bei Käufen, aber Mean bei "3" --> Ausreißer verzerren Bild!
-
 ####### Dissimilarity zwischen den Büchern berechnen #######
 ## Cluster-Package einladen & auf Similarity zwischen Author, Verlag und MainTopic überprüfen
-books_distance <- joined_tbl_onlyOrders[, c("author", "publisher", "main.topic")]
-dissimilarity_books <- daisy(books_distance, metric = "gower", weights = c(2, 0.5, 1))
-dissimilarity_books <- as.matrix(dissimilarity_books)
+tibble_with_ratios_ohneNA <- tibble_with_ratios[!is.na(tibble_with_ratios$sum_clicks) ,]
+books_features <- tibble_with_ratios_ohneNA[, c("author", "main_topic", "publisher")]
+dissimilarity <- daisy(books_features, metric = "gower", weights = c(2, 1, 1))
+dissimilarity <- as.matrix(dissimilarity)
 
 ## Rownames & Colnames
-row.names(dissimilarity_books) <- joined_tbl_onlyOrders$itemID
-colnames(dissimilarity_books) <- joined_tbl_onlyOrders$itemID
+row.names(dissimilarity) <- joined_tbl_onlyOrders$itemID
+colnames(dissimilarity) <- joined_tbl_onlyOrders$itemID
 ## Similarity der Bücher prüfen --> 0="gleich", 1="komplett unterschiedlich"
-dissimilarity_books[35:40, 35:40]
+dissimilarity[35:40, 35:40]
 ## Reihenfolge der Recommendations
 # 1 - gleicher Titel, gleicher Autor, gleicher Verlag, gleiches MainTopic
 # 2 - gleicher Autor, gleiches MainTopic
