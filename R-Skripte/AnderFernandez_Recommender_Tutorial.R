@@ -49,9 +49,9 @@ tibble_with_ratios <- joined_oR %>%
     author = author,
     publisher = publisher,
     main_topic = main.topic,
-    sum_clicks = sum(click),
-    sum_basket = sum(basket),
-    sum_order = sum(order),
+    sum_clicks = sum(click, na.rm=T),
+    sum_basket = sum(basket, na.rm=T),
+    sum_order = sum(order, na.rm=T),
     mean_click_order_ratio = mean(click_order_ratio),
     mean_basket_order_ratio = mean(basket_order_ratio)
   ) %>%
@@ -59,23 +59,14 @@ tibble_with_ratios <- joined_oR %>%
   lapply(factor) %>%
   data.frame()
 # Übersicht
-summary(tibble_with_ratios)
-glimpse(tibble_with_ratios)
 head(tibble_with_ratios, n=20)
-
-## Variablen rekodieren in Factor
-# joined_oR <- as_tibble(lapply(joined_oR, factor))
-# head(joined_oR, n=20)
+glimpse(tibble_with_ratios)
+summary(tibble_with_ratios)
 
 ## an 'numerischen' Factor itemID den Zusatz 'IID' hängen, damit später keine Probleme auftreten beim umwandeln in Zeilen-und Spaltennamen der Matrix
 # joined_oR$sessionID <- as.factor(paste0("SID.", joined_oR$sessionID))
 tibble_with_ratios$itemID <- as.factor(paste0("IID.", tibble_with_ratios$itemID))
 head(tibble_with_ratios, n=20)
-
-## NA-Daten von click, basket und order rasuwerfen
-# joined_tbl_onlyOrders <- joined_oR %>%
-#   filter(!is.na(order) & order != 0)
-# head(joined_tbl_onlyOrders, n=20) # ca 50.000 Zeilen entfernt & etwa 365.000 Zeilen verbleiben
 
 ########### Daten inspizieren #############
 # # Plot: meiste Autoren
@@ -97,15 +88,16 @@ head(tibble_with_ratios, n=20)
 #   theme_minimal()
 
 ####### Dissimilarity zwischen den Büchern berechnen #######
-## Cluster-Package einladen & auf Similarity zwischen Author, Verlag und MainTopic überprüfen
-tibble_with_ratios_ohneNA <- tibble_with_ratios[!is.na(tibble_with_ratios$sum_clicks) ,]
-books_features <- tibble_with_ratios_ohneNA[, c("author", "main_topic", "publisher")]
-dissimilarity <- daisy(books_features, metric = "gower", weights = c(2, 1, 1))
+## Cluster-Package einladen & auf Similarity zwischen Author, Verlag und MainTopic überprüfen mit 'Gower'-Distanz
+# nur mit 10.000 Beobachtungen
+books_features <- tibble_with_ratios[1:20000, c("author", "main_topic", "publisher", "mean_click_order_ratio", "mean_basket_order_ratio")]
+dissimilarity <- daisy(books_features, metric = "gower", weights = c(1.5, 1.5, 0.3, 1.5, 1))
 dissimilarity <- as.matrix(dissimilarity)
+feature_ids <- tibble_with_ratios[1:20000, c("itemID")]
 
 ## Rownames & Colnames
-row.names(dissimilarity) <- joined_tbl_onlyOrders$itemID
-colnames(dissimilarity) <- joined_tbl_onlyOrders$itemID
+row.names(dissimilarity) <- feature_ids
+colnames(dissimilarity) <- feature_ids
 ## Similarity der Bücher prüfen --> 0="gleich", 1="komplett unterschiedlich"
 dissimilarity[35:40, 35:40]
 ## Reihenfolge der Recommendations
@@ -120,31 +112,31 @@ dissimilarity[35:40, 35:40]
 # irgendeine ItemID raussuchen als extra Variable definieren
 spec_item_id <- "IID.369"
 # Merkmale der ItemID in Datensatz rausfiltern und extra abspeichern
-spec_item_books <- joined_tbl_onlyOrders %>%
+spec_item_books <- tibble_with_ratios %>%
   filter(itemID == spec_item_id)
 head(spec_item_books, n=10)
 
 ## itemID wieder als Character-Variable rekodieren
-joined_tbl_onlyOrders$itemID <- as.character(joined_tbl_onlyOrders$itemID)
+tibble_with_ratios$itemID <- as.character(tibble_with_ratios$itemID)
 
 ## neuen 
-selected_books <- spec_item_books[, c("itemID", "author", "publisher", "main.topic")]
-recommend <- function(selected_books2, dissimilarity_matrix, books, n_recommendations=5)
+spec_selected_books <- spec_item_books[, c("itemID", "author", "publisher", "main_topic", "mean_click_order_ratio", "mean_basket_order_ratio")]
+recommend <- function(selected_books, dissimilarity_matrix, books, n_recommendations=5)
   {
-  selected_books_index <- which(colnames(dissimilarity_matrix) %in% selected_books2$itemID)
+  selected_books_index <- which(colnames(dissimilarity_matrix) %in% selected_books$itemID)
   
   results = data.frame(dissimilarity_matrix[, selected_books_index],
                        recommended_book = row.names(dissimilarity_matrix),
-                       stringsAsFactors = F)
+                       stringsAsFactors=F)
   
   recommendations = results %>%
     pivot_longer(cols = c(-"recommended_book"),
                  names_to = "readed_book",
                  values_to = "dissimilarity") %>%
-    left_join(selected_books2, by = c("recommended_book" = "itemID")) %>%
+    left_join(selected_books, by = c("recommended_book" = "itemID")) %>%
     arrange(desc(dissimilarity)) %>%
     filter(recommended_book != readed_book) %>%
-    filter(!is.na(author) & !is.na(main.topic)) %>%
+    filter(!is.na(author) & !is.na(main_topic) !is.na(publisher) & !is.na(mean_click_order_ratio) & !is.na(mean_basket_order_ratio)) %>%
     mutate(
       similarity = 1-dissimilarity
     ) %>%
@@ -153,12 +145,12 @@ recommend <- function(selected_books2, dissimilarity_matrix, books, n_recommenda
     group_by(recommended_book) %>%
     slice(1) %>%
     top_n(n_recommendations, similarity) %>%
-    left_join(joined_tbl_onlyOrders, by = c("recommended_book"="itemID"))
+    left_join(tibble_with_ratios, by = c("recommended_book"="itemID"))
 
   return(recommendations)
   }
 
-recommendation <- recommend(selected_books, dissimilarity_books, joined_tbl_onlyOrders)
+recommendation <- recommend(selected_books, dissimilarity, tibble_with_ratios[1:20000])
 recommendation
 
 ######### Cosinus-Ähnlichkeit ###########
@@ -170,7 +162,15 @@ cos_similarity <- function(A,B) {
   return(result)
 }
 
-
+######### Dissimilarity nur mit Ratios ############
+books_features_ratios <- tibble_with_ratios[1:20000, c("mean_click_order_ratio", "mean_basket_order_ratio")]
+dissimilarity_ratios <- daisy(books_features_ratios, metric = "gower")
+dissimilarity_ratios <- as.matrix(dissimilarity_ratios)
+row.names(dissimilarity_ratios) <- tibble_with_ratios$itemID[1:20000]
+colnames(dissimilarity_ratios) <- tibble_with_ratios$itemID[1:20000]
+## Similarity der Bücher prüfen --> 0="gleich", 1="komplett unterschiedlich"
+dissimilarity_ratios[150:155, 150:155] # BISHER NUR NA's!!!
+## Funktion
 
 
 
