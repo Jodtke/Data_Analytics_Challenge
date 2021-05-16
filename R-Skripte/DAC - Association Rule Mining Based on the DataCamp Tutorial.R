@@ -86,6 +86,11 @@ inspect(head(tr))
 library(RColorBrewer)
 itemFrequencyPlot(tr, topN = 10, type = "absolute", col = brewer.pal(8, "Pastel2"), main = "Absolute Item Frequency Plot")
 
+complete %>% 
+  group_by(title) %>% 
+  dplyr::summarise(n = n()) %>%
+  arrange(desc(n))
+
 # Funktioniert tats?chlich da in der EDA ebenfalls diese B?cher angezeigt werden!
 
 # Generating Rules!
@@ -185,7 +190,7 @@ library(plyr)
 #ddply(dataframe, variables_to_be_used_to_split_data_frame, function_to_be_applied)
 transactionData <- ddply(complete, "sessionID",
                          function(df1)paste(df1$`main topic`,
-                                            collapse = "|"))
+                                            collapse = ";"))
 
 #set column sessionID of dataframe transactionData  
 transactionData$sessionID <- NULL
@@ -201,21 +206,20 @@ transactionData
 write.csv(transactionData, "actual_transactions.csv", quote = FALSE, row.names = FALSE)
 
 # Next, you have to load this transaction data into an object of the transaction class.
-tr <- read.transactions("actual_transactions.csv", format = "basket", sep = "|")
+tr <- read.transactions("actual_transactions.csv", format = "basket", sep = ";")
 # m?ssen hier bei sep das "|" Symbol verwenden, da wir diese weiter oben auch so getrennt haben!
 
 summary(tr)
+inspect(tr)
 
 # Create an item frequency plot for the top 10 items
 
 library(RColorBrewer)
 itemFrequencyPlot(tr, topN = 10, type = "absolute", col = brewer.pal(8, "Pastel2"), main = "Absolute Item Frequency Plot")
 
-transactions %>% 
-  left_join(items, by = "itemID") %>% 
-  filter(order > 0) %>% 
+complete %>% 
   group_by(`main topic`) %>% 
-  summarize(n = n()) %>% 
+  dplyr::summarise(n = n()) %>%
   arrange(desc(n))
 
 # Funktioniert nicht wie bei title, da die EDA mehr und andere Topics anzeigt
@@ -233,6 +237,43 @@ inspect(association.rules[1:10])
 subset.rules <- which(colSums(is.subset(association.rules, association.rules)) > 1) # get subset rules in vector
 length(subset.rules)
 subset.association.rules. <- association.rules[-subset.rules] # remove subset rules.
+summary(subset.association.rules.)
+inspect(subset.association.rules.[1:10])
+
+# Finding Rules related to given items
+
+# load the data set with the target items
+evaluation <- read.csv("./Data/evaluation.csv")
+testSet <- evaluation %>%
+  inner_join(items, by = "itemID") 
+testSet <- testSet %>% 
+  inner_join(complete) %>% 
+  select(`main topic`)
+
+testSet <- unique(testSet)
+
+#testSet <- apply(head(testSet,3),1, as.character)
+testSet <- head(testSet,2)
+
+target.association.rules <- apriori(tr, parameter = list(supp = 0.001, conf = 0.8), appearance = list(default="lhs",rhs=testSet))
+# Here lhs=METAL because you want to find out the probability of that in how many customers buy METAL along with other items
+inspect(head(target.association.rules))
+
+# Similarly, to find the answer to the question Customers who bought METAL also bought.... you will keep METAL on lhs:
+target.association.rules <- apriori(tr, parameter = list(supp=0.00001, conf=0.2),appearance = list(lhs= "JNLA", default="rhs"))
+summary(target.association.rules)
+inspect(target.association.rules)
+
+# Problem: Offenbar lassen sich für manche Items nicht einmal 5 Regeln finden
+
+# Similarly, to find the answer to the question Customers who bought METAL also bought.... you will keep METAL on lhs:
+target.association.rules <- apriori(tr, parameter = list(supp=0.00001, conf=0.2),appearance = list(lhs=testSet, default="rhs"))
+summary(target.association.rules)
+inspect(target.association.rules)
+
+# Visualizing Association Rules
+
+# Scatter-Plot
 
 # Filter rules with confidence greater than 0.4 or 40%
 subRules<-association.rules[quality(association.rules)$confidence>0.4]
