@@ -136,11 +136,11 @@ recommend <- function(selected_books, dissimilarity_matrix, books, n_recommendat
     left_join(selected_books, by = c("recommended_book" = "itemID")) %>%
     arrange(desc(dissimilarity)) %>%
     filter(recommended_book != readed_book) %>%
-    filter(!is.na(author) & !is.na(main_topic) !is.na(publisher) & !is.na(mean_click_order_ratio) & !is.na(mean_basket_order_ratio)) %>%
     mutate(
-      similarity = 1-dissimilarity
+      similarity = 1-dissimilarity,
+      weighted_similarity = similarity*click_order_ratio
     ) %>%
-    arrange(desc(similarity)) %>%
+    arrange(desc(weighted_similarity)) %>%
     filter(similarity>0) %>%
     group_by(recommended_book) %>%
     slice(1) %>%
@@ -150,7 +150,7 @@ recommend <- function(selected_books, dissimilarity_matrix, books, n_recommendat
   return(recommendations)
   }
 
-recommendation <- recommend(selected_books, dissimilarity, tibble_with_ratios[1:20000])
+recommendation <- recommend(spec_selected_books, dissimilarity, tibble_with_ratios[1:20000], n_recommendations=5)
 recommendation
 
 ######### Cosinus-Ähnlichkeit ###########
