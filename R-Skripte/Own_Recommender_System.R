@@ -17,10 +17,26 @@ library(tidyverse)
 # Da wir ja bereits festegestellt haben, dass diverse Autoren häufiger unter einem anderen Namen vorkommen,
 # verwenden wir die von Eric mittels Open Refine vorbehandelte Matrix. In dieser sind bestenfalls auch schon
 # die Main Topics auf die ersten zwei, drei Buchstaben zusammengestampft.
-items <- read.csv("./Data/items_bearbeitet4.csv")
+joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names = T, col_types = cols(
+  itemID=col_factor(),
+  title=col_character(),
+  author=col_character(),
+  publisher=col_character(),
+  main.topic=col_character(),
+  subtopics=col_character(),
+  sessionID=col_factor(),
+  click=col_integer(),
+  basket=col_integer(),
+  order=col_integer()
+))
+head(joined_item_trans, n=10)
+glimpse(joined_item_trans)
+## Reihenfolge der Spalten verändern
+joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
+head(joined_item_trans, n=10)
 
 # Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Genre
-AuthMat <- items %>% 
+AuthMat <- joined_item_trans %>% 
   group_by(author, main.topic) %>% 
   dplyr::summarise(n = n()) %>% 
   spread(key = main.topic, value = n)

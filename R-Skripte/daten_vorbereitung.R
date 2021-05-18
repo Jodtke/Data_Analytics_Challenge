@@ -12,24 +12,24 @@ library(tidyverse)
 getwd()
 
 ## Daten
-#items_raw <- read.csv(file = "./Data/items.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-#dim(items_raw)    #78 334 x 6
-transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
-dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/items_bearbeitet5.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
-dim(openRefine)
+joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names = T, col_types = cols(
+  itemID=col_factor(),
+  title=col_character(),
+  author=col_character(),
+  publisher=col_character(),
+  main.topic=col_character(),
+  subtopics=col_character(),
+  sessionID=col_factor(),
+  click=col_integer(),
+  basket=col_integer(),
+  order=col_integer()
+))
+head(joined_item_trans, n=10)
+glimpse(joined_item_trans)
+## Reihenfolge der Spalten verändern
+joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
+head(joined_item_trans, n=10)
 
-# als Tibble kovertieren
-# items_tbl <- as_tibble(items_raw)
-# glimpse(items_tbl)
-# head(items_tbl, n = 20)
-transactions_tbl <- as_tibble(transactions_raw)
-glimpse(transactions_tbl)
-head(transactions_tbl, n = 10)
-# bereinigter Datensatz aus Open Refine
-oR_tbl <- as_tibble(openRefine)
-glimpse(oR_tbl)
-head(oR_tbl, n = 10)
 
 ################################## Datenexploration ###########################################
 ### Items
@@ -195,20 +195,6 @@ head(oR_tbl, n = 10)
 #             N = n()) %>%
 #   arrange(desc(nOrder)) %>%
 #   print()
-
-
-############################## Joining - Open Refine Datensatz ##################################
-#### Open Refine Datensatz
-joined_oR <- left_join(oR_tbl, transactions_tbl, by = "itemID")
-glimpse(joined_oR)
-head(joined_oR, n = 20)
-# Reihenfolge der Spalten verändern
-joined_oR <- joined_oR[c(1,7:10,2:6)] 
-joined_oR <- joined_oR %>%
-  mutate(main.topic = as.factor(main.topic),
-         itemID = as.character(itemID),
-         sessionID = as.character(sessionID))
-head(joined_oR, n = 20)
 
 # wie oft jeder main.topic im Laden vorkommt
 count_maintopics <- count(joined_oR, main.topic) %>% arrange(desc(n))
