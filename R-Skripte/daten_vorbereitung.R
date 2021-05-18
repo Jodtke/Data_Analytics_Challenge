@@ -7,8 +7,6 @@ library(tidyverse)
 #library(janitor)
 #library(summarytools)
 #library(tmaptools)
-library(arules)
-library(arulesViz)
 
 ## Arbeitsverzeichnis
 getwd()
@@ -18,7 +16,7 @@ getwd()
 #dim(items_raw)    #78 334 x 6
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
+openRefine <- read.csv(file = "./Data/items_bearbeitet5.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF8-8")
 dim(openRefine)
 
 # als Tibble kovertieren
@@ -68,72 +66,72 @@ head(oR_tbl, n = 10)
 
 ### Items (open refine)
 ## Häufigste Buchtitel im Handel
-oR_tbl %>% 
-  select(itemID, title, author, publisher) %>%
-  group_by(title) %>%
-  summarise(N = n()) %>%
-  arrange(desc(N))
-## Häufigste Autoren im Handel
-oR_tbl %>%
-  select(itemID, title, author, publisher) %>%
-  group_by(author) %>%
-  summarise(N = n()) %>%
-  arrange(desc(N))
-## Häufigste Verlage im Handel
-oR_tbl %>%
-  select(itemID, title, author, publisher) %>%
-  group_by(publisher) %>%
-  summarise(N = n()) %>%
-  arrange(desc(N))
-## Häufigste Kombination aus Autor & Buchtitel
-oR_tbl %>%
-  select(itemID, title, author, publisher) %>%
-  group_by(author, title) %>%
-  summarise(N = n()) %>%
-  arrange(desc(N))
-## Häufigste Kombination aus Autor & Verlag
-oR_tbl %>%
-  select(itemID, title, author, publisher) %>%
-  group_by(author, publisher) %>%
-  summarise(N = n()) %>%
-  arrange(desc(N))
-
-### Transactions
-## Häufigste Clicks einer itemID
-transactions_tbl %>%
-  group_by(itemID) %>%
-  summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
-  arrange(desc(nClick))
-## Häufigste Warenkörbe einer itemID
-transactions_tbl %>%
-  group_by(itemID) %>%
-  summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
-  arrange(desc(nBasket))
-## Häufigste Käufe einer itemID
-transactions_tbl %>%
-  group_by(itemID) %>%
-  summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
-  arrange(desc(nOrder))
-## am Häufigsten auftretende itemID in SessionID (allgemein)
-transactions_tbl %>%
-  group_by(itemID) %>%
-  summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
-  arrange(desc(N))
+# oR_tbl %>% 
+#   select(itemID, title, author, publisher) %>%
+#   group_by(title) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Autoren im Handel
+# oR_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(author) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Verlage im Handel
+# oR_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(publisher) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Kombination aus Autor & Buchtitel
+# oR_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(author, title) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# ## Häufigste Kombination aus Autor & Verlag
+# oR_tbl %>%
+#   select(itemID, title, author, publisher) %>%
+#   group_by(author, publisher) %>%
+#   summarise(N = n()) %>%
+#   arrange(desc(N))
+# 
+# ### Transactions
+# ## Häufigste Clicks einer itemID
+# transactions_tbl %>%
+#   group_by(itemID) %>%
+#   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
+#   arrange(desc(nClick))
+# ## Häufigste Warenkörbe einer itemID
+# transactions_tbl %>%
+#   group_by(itemID) %>%
+#   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
+#   arrange(desc(nBasket))
+# ## Häufigste Käufe einer itemID
+# transactions_tbl %>%
+#   group_by(itemID) %>%
+#   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
+#   arrange(desc(nOrder))
+# ## am Häufigsten auftretende itemID in SessionID (allgemein)
+# transactions_tbl %>%
+#   group_by(itemID) %>%
+#   summarise(nClick = sum(click), nBasket = sum(basket), nOrder = sum(order), N = n()) %>%
+#   arrange(desc(N))
 
 # summarytools::freq(transactions_tbl$click)
 # summarytools::freq(transactions_tbl$basket)
 # summarytools::freq(transactions_tbl$order)
 #summarytools::view(descr(transactions_tbl))
 
-# einzigartige itemID's
+########### einzigartige itemID's ############
 #length(unique(items_tbl$itemID))
-length(unique(transactions_tbl$itemID))
-length(unique(oR_tbl$itemID))
-
-length(unique(transactions_tbl$sessionID)) # einzigartige sessions 271 983 
-## nur doppelte sessions
-transactions_tbl[transactions_tbl$sessionID %in%
-                   transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
+# length(unique(transactions_tbl$itemID))
+# length(unique(oR_tbl$itemID))
+# 
+# length(unique(transactions_tbl$sessionID)) # einzigartige sessions 271 983 
+# ## nur doppelte sessions
+# transactions_tbl[transactions_tbl$sessionID %in%
+#                    transactions_tbl$sessionID[duplicated(transactions_tbl$sessionID)],]
 
 #################################### Joining ###################################################
 # #### items Datensatz ()
@@ -286,16 +284,3 @@ ggsave("10_available_topics.jpeg", width = 297, height = 210, units = "mm")
 
 #### HEATMAP with 10 main best sell topics 
 
-
-
-
-#joined_tbl %>%  select(itemID, main.topic, click, basket, order) %>%
-#group_by(main.topic)%>%
-bestseller_topics <- joined_oR %>%
-  group_by(itemID) %>%
-  summarise(nClick = sum(click),
-            nBasket = sum(basket), 
-            nOrder = sum(order), 
-            N = n()) %>%
-  arrange(desc(nOrder)) %>%
-  print()
