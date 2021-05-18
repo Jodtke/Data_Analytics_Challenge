@@ -63,6 +63,21 @@ view(oR_tbl %>% filter(author == "Leslie Kimmelman"))    #3 Books, same publishe
 #replace NAs with Albert Whitman
 oR_tbl <- transform(oR_tbl, 
         author = ifelse(publisher == "Albert Whitman & Company" & author == "", "Albert Whitman" , author))
-view(oR_tbl %>% filter(publisher == "Arena Verlag Gmbh"))
-    
+view(oR_tbl %>% filter(publisher == "Trötsch Verlag Gmbh"))
+#replace Dorling Kindersley Ltd Dorling Kindersley with  Dorling Kindersley Verlag
+view(oR_tbl %>% filter(str_detect(oR_tbl$publisher, "^Dorling")))
+oR_tbl <- transform(oR_tbl, 
+                    publisher = ifelse(publisher == "Dorling Kindersley" & publisher == "Dorling Kindersley Ltd",
+                                       "Dorling Kindersley Verlag" , publisher))
+oR_tbl <- transform(oR_tbl, 
+                    author = ifelse(publisher == "Dorling Kindersley Verlag" & author == "",
+                                    "Dorling Kindersley" , author))
+#replace Trötsch with Trötsch Verlag Gmbh
+oR_tbl <- transform(oR_tbl, 
+                    publisher = ifelse(publisher == "Trötsch", "Trötsch Verlag Gmbh", publisher))
+view(oR_tbl %>% filter(publisher=="Trötsch Verlag Gmbh"))
+#replace author for Publischer Trötsch Verlag Gmbh with Trötsch
+oR_tbl <- transform(oR_tbl, 
+                    author = ifelse(publisher == "Trötsch Verlag Gmbh" & author == "", "Trötsch" , author))
+count(oR_tbl %>% filter(author == "Trötsch")) #96 replacements
 
