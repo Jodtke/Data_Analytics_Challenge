@@ -14,38 +14,34 @@ library(cluster)
 getwd()
 
 ########### Daten ###########
-transactions_raw <- read.csv(file = "./Data/transactions.csv", header=T, sep="|", quote="", row.names=NULL, stringsAsFactors=F)
-dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/items_bearbeitet4.csv", header=T, sep=",", row.names=NULL, stringsAsFactors=F, encoding="UTF-8")
-dim(openRefine)
-
-######### Daten bearbeiten ############
-## als Tibble kovertieren
-transactions_tbl <- as_tibble(transactions_raw)
-glimpse(transactions_tbl)
-head(transactions_tbl, n=10)
-oR_tbl <- as_tibble(openRefine)
-glimpse(oR_tbl)
-head(oR_tbl, n=10)
-
-## Joining
-joined_oR <- left_join(oR_tbl, transactions_tbl, by="itemID")
-glimpse(joined_oR)
-head(joined_oR, n=20)
+joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names = T, col_types = cols(
+  itemID=col_factor(),
+  title=col_character(),
+  author=col_character(),
+  publisher=col_character(),
+  main.topic=col_character(),
+  subtopics=col_character(),
+  sessionID=col_factor(),
+  click=col_integer(),
+  basket=col_integer(),
+  order=col_integer()
+))
+head(joined_item_trans, n=10)
+glimpse(joined_item_trans)
 ## Reihenfolge der Spalten verändern
-joined_oR <- joined_oR[, c(7,1,8:10,2:6) ]
-head(joined_oR, n=10)
+joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
+head(joined_item_trans, n=10)
 
 ## durchschnittliche Click-Order-Ratio pro Item berechnen
-joined_oR$click_order_ratio <- joined_oR$click / joined_oR$order
-joined_oR$click_order_ratio <- sapply(joined_oR$click_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
+joined_item_trans$click_order_ratio <- joined_item_trans$click / joined_oR$order
+joined_item_trans$click_order_ratio <- sapply(joined_item_trans$click_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
 ## durchschnittliche Basket-Order-Ration pro Item berechnen
-joined_oR$basket_order_ratio <- joined_oR$basket / joined_oR$order
-joined_oR$basket_order_ratio <- sapply(joined_oR$basket_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
-head(joined_oR, n=10)
-glimpse(joined_oR, n=10)
+joined_item_trans$basket_order_ratio <- joined_item_trans$basket / joined_item_trans$order
+joined_item_trans$basket_order_ratio <- sapply(joined_item_trans$basket_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
+head(joined_item_trans, n=10)
+glimpse(joined_item_trans, n=10)
 ## neues Tibble --> nach itemID zusammengefasste Werte!
-tibble_with_ratios <- joined_oR %>%
+tibble_with_ratios <- joined_item_trans %>%
   group_by(itemID) %>%
   summarise(
     author = author,
@@ -119,10 +115,10 @@ recommend <- function(selected_books, dis_matrix, books, n_recommendations=5)
                        stringsAsFactors=F)
   
   recommendations = results %>%
-    pivot_longer(cols = c(-"recommended_book"), names_to = "readed_book", values_to = "dissimilarity") %>%
+    pivot_longer(cols = c(-"recommended_book"), names_to = "read_book", values_to = "dissimilarity") %>%
     left_join(selected_books, by = c("recommended_book" = "itemID")) %>%
     arrange(desc(dissimilarity)) %>%
-    filter(recommended_book != readed_book) %>%
+    filter(recommended_book != read_book) %>%
     mutate(
       similarity = 1 - as.numeric(dissimilarity),
       weighted_similarity = as.numeric(similarity) * as.numeric(mean_click_order_ratio)
