@@ -55,17 +55,17 @@ view(filter(items_tbl,itemID %in% c(78430, 33151,30590,29803,33179))) #all right
 #######################################################
 
 
-#inspect Albert Whitman & Company
+#inspect publisher Albert Whitman & Company
 view(authorNAs %>% filter(publisher== "Albert Whitman & Company")) #97 NAs
 view(oR_tbl %>% filter(publisher== "Albert Whitman & Company")) #173 Books from this publisher
 view(oR_tbl %>% filter(author == "Mike Litwin"))         #1 Book, same publisher
 view(oR_tbl %>% filter(author == "Linda Joy Singleton")) #2 Books, same publisher
 view(oR_tbl %>% filter(author == "Leslie Kimmelman"))    #3 Books, same publisher
-
 #replace NAs with Albert Whitman
 oR_tbl <- transform(oR_tbl, 
         author = ifelse(publisher == "Albert Whitman & Company" & author == "", "Albert Whitman" , author))
 view(oR_tbl %>% filter(publisher == "Trötsch Verlag Gmbh"))
+
 #replace Dorling Kindersley Ltd Dorling Kindersley with  Dorling Kindersley Verlag
 view(oR_tbl %>% filter(str_detect(oR_tbl$publisher, "^Dorling")))
 oR_tbl <- transform(oR_tbl, 
@@ -83,3 +83,26 @@ oR_tbl <- transform(oR_tbl,
                     author = ifelse(publisher == "Trötsch Verlag Gmbh" & author == "", "Trötsch" , author))
 count(oR_tbl %>% filter(author == "Trötsch")) #96 replacements
 
+#Arena Verlag Gmbh and Arena
+view(oR_tbl %>% filter(str_detect(oR_tbl$publisher, "^Arena")))
+oR_tbl <- transform(oR_tbl, 
+                    publisher = ifelse(publisher == "Arena",
+                                       "Arena Verlag Gmbh" , publisher))
+view(filter(oR_tbl, publisher=="Arena Verlag Gmbh"))
+oR_tbl <- transform(oR_tbl, 
+                    author = ifelse(publisher == "Arena Verlag Gmbh" & author == "",
+                                    "Arena" , author))
+view(filter(oR_tbl, author=="Arena")) #58 replacements
+#Ars Edition Gmbh and Ars Edition
+view(oR_tbl %>% filter(str_detect(oR_tbl$publisher, "^Ars")))
+filter(oR_tbl, publisher=="Ars Vivendi") #only one in all data set
+view(oR_tbl %>% filter(str_detect(oR_tbl$author, "^Annabell Stochay"))) # only one author for this unique publisher
+oR_tbl <- transform(oR_tbl, 
+                    publisher = ifelse(publisher == "Ars Edition",
+                                       "Ars Edition Gmbh" , publisher))
+oR_tbl <- transform(oR_tbl, 
+                    author = ifelse(publisher == "Ars Edition Gmbh" & author == "",
+                                    "Ars Edition" , author))
+
+as_tibble(oR_tbl)
+filter(oR_tbl, itemID==2399)
