@@ -7,7 +7,7 @@ library(janitor)
 ## daten
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 dim(transactions_raw)  #365 143 x 5
-openRefine <- read.csv(file = "./Data/items_bearbeitet5.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF-8")
+openRefine <- read.csv(file = "./Data/items2.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF-8")
 dim(openRefine)
 transactions_tbl <- as_tibble(transactions_raw)
 oR_tbl <- as_tibble(openRefine)
@@ -32,7 +32,7 @@ joined_oR %>% select(main.topic) %>% filter(nchar(main.topic) > 3) # 0 Fälle vo
 joined_oR %>% select(main.topic) %>% filter(main.topic == "WZSN") # 0 Fälle von WZSN in MainTopic
 joined_oR %>% select(main.topic) %>% filter(main.topic == "WZS") # viele Fälle von WZS --> Check!
 
-## neue csv schreiben
+## neue csv schreiben für joined csv-tabelle mit items & transactions
 write_csv(joined_oR, file="./Data/joined_item_trans.csv", col_names=T)
 joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names = T, col_types = cols(
   itemID=col_factor(),
@@ -48,7 +48,24 @@ joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names =
 ))
 head(joined_item_trans, n=20)
 
-# alternativ: mit Trimmer-Funktion --> Funktioniert noch nicht ganz? ):
+########## neue csv schreiben für itemliste only ########
+## items einlesen
+items <- read.csv(file="./Data/items.csv", col.names=T)
+items2_tbl <- as_tibble(items)
+## mainTopics auf 3 reduzieren
+items2_tbl <- items2_tbl %>%
+  mutate(
+    main.topic = sapply(main.topic, function(x) if_else(nchar(x) > 3, str_trunc(x, width=3), x)),
+    main.topic = as.character(main.topic)
+  )
+## überprüfen
+items2_tbl %>% filter(nchar(main.topic) > 3)
+## neue items2.csv schreiben
+write_csv(items2_tbl, file="./Data/items2.csv", col_names=T)
+## testweise einlesen
+items2 <- read_csv(file="./Data/items2.csv", col_names=T)
+
+########### alternativ: mit Trimmer-Funktion --> Funktioniert noch nicht ganz? ): ##########
 mainTopic_trimmer <- function(x) {
   for (idx in 1:length(x)) {
     if (nchar(idx) > 3) {
