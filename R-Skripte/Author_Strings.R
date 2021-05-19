@@ -48,8 +48,21 @@ joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names =
 ))
 head(joined_item_trans, n=20)
 
-## neue csv schreiben für itemliste only
+########## neue csv schreiben für itemliste only ########
+## items einlesen
+items <- read.csv(file="./Data/items.csv", col.names=T)
+items2_tbl <- as_tibble(items)
+## mainTopics auf 3 reduzieren
+items2_tbl <- items2_tbl %>%
+  mutate(
+    main.topic = sapply(main.topic, function(x) if_else(nchar(x) > 3, str_trunc(x, width=3), x)),
+    main.topic = as.character(main.topic)
+  )
+## überprüfen
+items2_tbl %>% filter(nchar(main.topic) > 3)
+## neue items2.csv schreiben
 write_csv(items2_tbl, file="./Data/items2.csv", col_names=T)
+## testweise einlesen
 items2 <- read_csv(file="./Data/items2.csv", col_names=T)
 
 ########### alternativ: mit Trimmer-Funktion --> Funktioniert noch nicht ganz? ): ##########
