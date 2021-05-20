@@ -26,12 +26,9 @@ evaluation_tbl <- as_tibble(evaluation)
 ##check how many items with NAs in items_5 are in evaluation dataset
 authorNAs <- oR_tbl %>% filter(author == "")
 dim(authorNAs)
+view(authorNAs)
 author_bearb <- right_join(authorNAs, evaluation_tbl)
 author_bearb <- drop_na(author_bearb)        # 62 rows tauchen in evaluation_DS auf
-view(author_bearb) 
-oR_tbl %>%  filter(itemID == 24686) #Achtung! kein author, publisher, 
-#main.topic, subtopic. Das Buch ist in evaluation Datensatz drin.
-#TITLE: Christmas Coloring Book For Kids: 50 Holiday Unique Designs For Girls And Boys Ages 4-8
 
 #Inspect group_by Verlag
 #Arena Verlag: Malbücher, Kreuzworträtsel, Alter 5
@@ -93,14 +90,6 @@ oR_tbl <- transform(oR_tbl,
 oR_tbl <- transform(oR_tbl, 
                     author = ifelse(publisher == "Ars Edition Gmbh" & author == "",
                                     "Ars Edition" , author))
-#update
-as_tibble(oR_tbl)
-authorNAs <- oR_tbl %>% filter(author == "")
-dim(authorNAs)
-author_bearb <- right_join(authorNAs, evaluation_tbl)
-author_bearb <- drop_na(author_bearb)        # 62 rows tauchen in evaluation_DS auf
-view(author_bearb) #42 items
-view(filter(oR_tbl, publisher=="Moewig"))
 #Yo Yo Books # Moewing
 oR_tbl <- transform(oR_tbl, 
                     author = ifelse(publisher == "Yo Yo Books" & author == "",
@@ -108,3 +97,36 @@ oR_tbl <- transform(oR_tbl,
 oR_tbl <- transform(oR_tbl, 
                     author = ifelse(publisher == "Moewig" & author == "",
                                     "Moewig" , author))
+
+#update
+as_tibble(oR_tbl)
+authorNAs <- oR_tbl %>% filter(author == "")
+dim(authorNAs)
+view(authorNAs)
+#handeln 
+
+#Applewood + Applewood Books
+#Baen
+#Blackharepress
+#Bob Jones Univ Pr
+#Bonnier Books Ltd UK
+#Books On Demand
+#Brianne Mitchell
+#Butzon & Bercker
+
+#Carlsen + Carlsen Verlag Gmbh
+#Castalia House
+
+#Childs Play + Child's Play International Ltd
+#Christophorus Verlag
+#Coppenrath and Coppenrath F
+#Dörfler + Dörfler Verlag Gmbh
+
+#Edition Michael Fischer
+#Fischer Kjb
+#Loewe Verlag Gmbh
+#St. Benno
+#Truant Ug
+#Panini Verlags Gmbh
+
+write_csv(oR_tbl, file="./Data/items3.csv", col_names=T)
