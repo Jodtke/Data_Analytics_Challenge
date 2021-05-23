@@ -1,22 +1,22 @@
 ######### k-means-clustering als numerisches Feature ###########
+library(tidyverse)
 # daten 
 circulo <- function(x, R, centroX=0, centroY=0){
-  r = R * sqrt(runif(x))
-  theta = runif(x) * 2 * pi
-  x = centroX + r * cos(theta)
-  y = centroY + r * sin(theta)
+  r = R*sqrt(runif(x))
+  theta = runif(x)*2*pi
+  x = centroX + r*cos(theta)
+  y = centroY + r*sin(theta)
   
-  z = data.frame(x = x, y = y)
+  z = data.frame(x=x, y=y)
   return(z)
 }
 
-library(ggplot2)
 set.seed(123)
 
 # We create points around three different points.
-datos_1 <- circulo(x = 20,R = 10, centroX = 5, centroY = 30)
-datos_2 <- circulo(x = 20,R = 10, centroX = 20, centroY = 10)
-datos_3 <- circulo(x = 20,R = 10, centroX = 50, centroY = 50)
+datos_1 <- circulo(x = 20, R = 10, centroX = 5, centroY = 30)
+datos_2 <- circulo(x = 20, R = 10, centroX = 20, centroY = 10)
+datos_3 <- circulo(x = 20, R = 10, centroX = 50, centroY = 50)
 
 
 datos = data.frame(
@@ -27,7 +27,7 @@ datos = data.frame(
 rm(datos_1,datos_2,datos_3, circulo)
 
 # distanzmessung zw datenpunkten und darstellung
-crear_centroides <- function(n_centroides = 3,datos = datos, columns_skip){
+crear_centroides <- function(n_centroides=3, datos=datos, columns_skip){
   datos_limpios = datos[ , -which(names(datos) %in% columns_skip)]
   columnas <- c(letters[24:26],letters[1:23])
   
@@ -39,10 +39,10 @@ crear_centroides <- function(n_centroides = 3,datos = datos, columns_skip){
   return(x)
 }
 
-centroides = crear_centroides(n_centroides = 3, datos = datos, columns_skip = "numero_punto")
+centroides = crear_centroides(n_centroides=3, datos=datos, columns_skip="numero_punto")
 
 ggplot() +
-  geom_text(aes(x,y, label = numero_punto), data = datos) + 
+  geom_text(aes(x, y, label=numero_punto), data=datos) + 
   geom_point(aes(x,y), col = "blue",alpha = 0.2, data = datos) + 
   geom_point(aes(x,y), data = centroides, size = 10, shape=21) +
   geom_text(aes(x,y, label = n_centroide), data = centroides, col = "black") +
@@ -98,7 +98,6 @@ ggplot() +
   theme_minimal() + theme(legend.position = "bottom") + guides(size = FALSE) 
 
 # klassifikation der k-means-cluster
-ibrary(dplyr)
 centroides <- datos %>%
   group_by(cluster) %>%
   summarize(
@@ -122,10 +121,10 @@ ggplot() +
 error = c(0,error)
 
 i = 2
-while(round(error[i],2) != round(error[i-1],2) ){
+while(round(error[i],2) != round(error[i-1],2) ) {
   
   # We calculate the distance
-  for(posicion in 1:length(datos$x)){
+  for(posicion in 1:length(datos$x)) {
     x <- unlist( c(
       (centroides[1,1] - datos[posicion,1])^2 + (centroides[1,2] - datos[posicion,2])^2,  
       (centroides[2,1] - datos[posicion,1])^2 + (centroides[2,2] - datos[posicion,2])^2, 
@@ -179,12 +178,12 @@ ggplot() +
   theme_minimal() + theme(legend.position = "bottom") + guides(size = FALSE) 
 
 # keine 'random' cluster-initialpunkte am anfang
-elevar <- function(x){
+elevar <- function(x) {
   x**2
 }
 
 
-kmeans_personalizada <- function(numero_iteraciones, datos, n_centroides, columns_skip){
+kmeans_personalizada <- function(numero_iteraciones, datos, n_centroides, columns_skip) {
   # We initialize the list where we will store the results
   resultados = list()
   
@@ -206,9 +205,9 @@ kmeans_personalizada <- function(numero_iteraciones, datos, n_centroides, column
     
     i = 2
     centroides_que_no_estan = c(1)
-    while(round(error[i],2) != round(error[i-1],2) | length(centroides_que_no_estan)> 0 ){
+    while(round(error[i],2) != round(error[i-1],2) | length(centroides_que_no_estan)> 0 ) {
       
-      for(posicion in 1:length(datos$x)){
+      for(posicion in 1:length(datos$x)) {
         
         #3. We calculate the squared error to each centroid
         repeticiones = rep(datos_limpios[posicion,], times = n_centroides)
@@ -242,8 +241,8 @@ kmeans_personalizada <- function(numero_iteraciones, datos, n_centroides, column
       
       centroides_que_no_estan = setdiff(seq(1:n_centroides), unique(datos$cluster))
       
-      # We check that we don0't have lost any cluster. If we have, then we add it
-      if(length(centroides_que_no_estan)> 0){
+      # We check that we don't have lost any cluster. If we have, then we add it
+      if(length(centroides_que_no_estan)> 0) {
         centroides_que_no_estan = setdiff(seq(1:n_centroides), unique(datos$cluster))
         
         centroides_nuevos = crear_centroides(n_centroides = length(centroides_que_no_estan), datos = datos, 
@@ -277,7 +276,7 @@ resultados <- kmeans_personalizada(numero_iteraciones = 5,
 # 5 k-means-funktionen checken auf niedrigste verlust-funktion
 iteraciones = c()
 
-for(i in 1:length(resultados)){
+for(i in 1:length(resultados)) {
   x = sum(resultados[[i]][[1]]$error)
   iteraciones = c(iteraciones,x)
 }
@@ -300,7 +299,7 @@ errores = data.frame(
   error = NA
 )
 
-for(i in 1:length(errores$numero_clusters)){
+for(i in 1:length(errores$numero_clusters)) {
   cluster <- kmeans_personalizada(numero_iteraciones = 1,
                                   n_centroides = i, datos = datos, 
                                   columns_skip = c("numero_punto","error", "cluster"))
@@ -309,8 +308,12 @@ for(i in 1:length(errores$numero_clusters)){
   
 }
 
-ggplot(errores, aes(numero_clusters, error)) + geom_line() + geom_point() + 
-  theme_minimal() + labs(title = "Error Total según el número de clusters") + scale_x_continuous(breaks = seq(1,30))
+ggplot(errores, aes(numero_clusters, error)) +
+  geom_line() +
+  geom_point() + 
+  theme_minimal() +
+  labs(title = "Error Total según el número de clusters") +
+  scale_x_continuous(breaks = seq(1,30))
 
 
 

@@ -67,7 +67,7 @@ summary(tibble_with_ratios)
 
 ## an 'numerischen' Factor itemID den Zusatz 'IID' hängen, damit später keine Probleme auftreten beim umwandeln in Zeilen-und Spaltennamen der Matrix
 tibble_with_ratios$itemID <- as.factor(paste0("IID.", tibble_with_ratios$itemID))
-tibble_with_ratios[, c(2:4) ] <- lapply(tibble_with_ratios[, c(2:4) ], FUN = factor)
+tibble_with_ratios[, c(2:4) ] <- lapply(tibble_with_ratios[, c(2:4) ], FUN=factor)
 head(tibble_with_ratios, n=20)
 
 # unnötige datensätze löschen
