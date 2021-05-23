@@ -1,6 +1,8 @@
 ######### k-means-clustering als numerisches Feature (evtl. für Gewichtung) ###########
 library(tidyverse)
 library(cluster)
+library(NbClust)
+library(parallel)
 
 ## Arbeitsverzeichnis
 getwd()
@@ -55,12 +57,12 @@ tibble_with_ratios <- joined_item_trans %>%
     mean_basket_order_ratio = as.factor(mean_basket_order_ratio)
     ) %>%
   distinct(.keep_all=T) %>%
-  filter(as.numeric(sum_clicks)>0 & as.numeric(sum_orders)>0)
+  filter(as.numeric(sum_orders)>0)
 head(tibble_with_ratios, n=20)
 
 books_features <- data.frame(tibble_with_ratios[, c("author", "main_topic", "publisher", "mean_click_order_ratio", "mean_basket_order_ratio") ] )
 head(books_features, n=10)
-features_dist <- daisy(books_features, metric="gower", weights=c(2, 1.5, 0.5, 1, 0.75))
+features_dist <- daisy(books_features, metric="gower", weights=c(1.25, 1.5, 0.25, 1, 0.75))
 features_distMatrix <- as.matrix(features_dist)
 
 ## visualize matrix --> kaum möglich mit 211 MB Matrix!!!!
@@ -74,18 +76,19 @@ features_distMatrix <- as.matrix(features_dist)
 # anzahl der cluster mit maximalem score (also höchster gleichheit innerhlab der cluster) wird gewählt für anzahl der cluster
 
 ########## silhouette methode ##########
-number_clusters <- NbClust::NbClust(diss=features_dist, distance=NULL, min.nc=5, max.nc=50, method="centroid", index="silhouette")
+number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=4, max.nc=10, method="centroid", index="silhouette", alphaBeale=0.1)
 
 # PAM anwenden
 features_pam <- pam(features_dist, 2)
 
 # visualize pam
-features_mds <- as.data.frame(cmdscale(features_dist,2))
+features_mds <- as.data.frame(cmdscale(features_dist, 2))
+rename(features_mds$disCluster1 = features_mds$V1, features_mds$disCluster2=features_mds$V2)
 features_mds$features_cluster <- as.factor(features_pam$clustering)
-ggplot(features_mds,aes(x=V1,y=V2,color=features_cluster)) + 
+ggplot(features_mds, aes(x=disCluster1, y=disCluster2, color=features_cluster)) + 
   geom_point() +
   theme_minimal() +
-  labs(title="MDS plot for domain questions",
+  labs(title="Cluster Plot for Similarities",
        subtitle="Colored by PAM cluster") +
   scale_color_brewer(palette="Set1")
 
