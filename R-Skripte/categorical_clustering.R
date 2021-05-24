@@ -8,7 +8,7 @@ library(parallel)
 getwd()
 
 ########### Daten ###########
-items <- read_csv(file="./Data/items4.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_factor(),
   author=col_factor(),
@@ -60,9 +60,9 @@ tibble_with_ratios <- joined_item_trans %>%
   filter(as.numeric(sum_orders)>0)
 head(tibble_with_ratios, n=20)
 
-books_features <- data.frame(tibble_with_ratios[, c("author", "main_topic", "publisher", "mean_click_order_ratio", "mean_basket_order_ratio") ] )
+books_features <- data.frame(tibble_with_ratios[, c("itemID", "author", "main_topic", "publisher", "mean_click_order_ratio", "mean_basket_order_ratio") ] )
 head(books_features, n=10)
-features_dist <- daisy(books_features, metric="gower", weights=c(1.25, 1.5, 0.25, 1, 0.75))
+features_dist <- daisy(books_features, metric="gower", weights=c(0.5, 1.25, 1.5, 0.25, 1, 0.75))
 features_distMatrix <- as.matrix(features_dist)
 
 ## visualize matrix --> kaum möglich mit 211 MB Matrix!!!!
@@ -76,14 +76,14 @@ features_distMatrix <- as.matrix(features_dist)
 # anzahl der cluster mit maximalem score (also höchster gleichheit innerhlab der cluster) wird gewählt für anzahl der cluster
 
 ########## silhouette methode ##########
-number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=4, max.nc=10, method="centroid", index="silhouette", alphaBeale=0.1)
+number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=25, method="median", index="silhouette", alphaBeale=0.1)
 
 # PAM anwenden
-features_pam <- pam(features_dist, 2)
+features_pam <- pam(features_distMatrix, 2)
 
 # visualize pam
 features_mds <- as.data.frame(cmdscale(features_dist, 2))
-rename(features_mds$disCluster1 = features_mds$V1, features_mds$disCluster2=features_mds$V2)
+features_mds <- features_mds %>% rename(disCluster1=V1, disCluster2=V2)
 features_mds$features_cluster <- as.factor(features_pam$clustering)
 ggplot(features_mds, aes(x=disCluster1, y=disCluster2, color=features_cluster)) + 
   geom_point() +
@@ -93,6 +93,23 @@ ggplot(features_mds, aes(x=disCluster1, y=disCluster2, color=features_cluster)) 
   scale_color_brewer(palette="Set1")
 
 # interpretation
-books_features$features_cluster <- features_mds$features_cluster
+books_features <- books_features %>%
+  mutate(
+    disCluster1 = round(features_mds$disCluster1, digit=2),
+    disCluster2 = round(features_mds$disCluster2, digit=2),
+    cluster = as.factor(features_mds$features_cluster)
+  )
+head(books_features, n=20)
 
+########### zweiter Ansatz ############
+silhouette <- c()
+silhouette = c(silhouette, NA)
+for (i in 2:25) {
+  pam_clusters = pam(as.matrix(features_dist), diss=T, k=i)
+  silhouette = c(silhouette, pam_clusters$silinfo$avg.width)
+}
+plot(1:15, silhouette,
+      xlab = "Clusters",
+      ylab = "Silhouette Width")
+lines(1:15, silhouette)
 
