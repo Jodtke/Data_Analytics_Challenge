@@ -141,24 +141,34 @@ view(authorNAs)
 items4 <- read_csv(file="./Data/items4.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_factor(),
-  author=col_factor(),
-  publisher=col_factor(),
+  author=col_character(),
+  publisher=col_character(),
   main.topic=col_factor(),
   subtopics=col_character()
 ))
 head(items4, n=20)
 glimpse(items4)
 
-######## Authoren NA'S ##########
+######## Authoren NAs ##########
 view(items4 %>% filter(is.na(author)))
+## Authoren NA's durch jeweilige angegebene Publisher zu ersetzen
+items4 <- items4 %>%
+  mutate(
+    author = ifelse(is.na(author), publisher, author)
+  )
+view(items4 %>% filter(is.na(author))) # keine NAs in den Autoren
 
-## Funktion, um Authoren NA's durch jeweilige angegebene Publisher zu ersetzen
-items5 <-  items4[is.na(items4$author) ,]
+########### Publisher NAs #############
+view(items4 %>% filter(is.na(publisher)))
+## publisher NA#s durch jeweilige Authoren ersetzen
+items4 <- items4 %>%
+  mutate(
+    publisher = ifelse(is.na(publisher), author, publisher)
+  )
+view(items4 %>% filter(is.na(publisher))) # keine NAs in den Publishern
 
-for(idx in 1:nrow(items5["author"])) {
-  replace_na(data=items5["author"], replace=items5["publisher"][idx,])
-}
-
+## neue csv items5 schreiben
+write_csv(items4, file="./Data/items5.csv", col_names=T)
 
 
 
