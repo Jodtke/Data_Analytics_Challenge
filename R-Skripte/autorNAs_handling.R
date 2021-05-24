@@ -135,4 +135,30 @@ view(authorNAs)
 #Saint Philip Street Press
 
 
-write_csv(oR_tbl, file="./Data/items3.csv", col_names=T)
+# write_csv(oR_tbl, file="./Data/items3.csv", col_names=T)
+
+############### items4 bearbeiten --> Authoren NA's ersetzen durch Publisher & evtl. Publisher durch Authoren ersetzen #############
+items4 <- read_csv(file="./Data/items4.csv", col_names=T, col_types=cols(
+  itemID=col_factor(),
+  title=col_factor(),
+  author=col_factor(),
+  publisher=col_factor(),
+  main.topic=col_factor(),
+  subtopics=col_character()
+))
+head(items4, n=20)
+glimpse(items4)
+
+######## Authoren NA'S ##########
+view(items4 %>% filter(is.na(author)))
+
+## Funktion, um Authoren NA's durch jeweilige angegebene Publisher zu ersetzen
+items5 <-  items4[is.na(items4$author) ,]
+
+for(idx in 1:nrow(items5["author"])) {
+  replace_na(data=items5["author"], replace=items5["publisher"][idx,])
+}
+
+
+
+

@@ -8,7 +8,7 @@ library(parallel)
 getwd()
 
 ########### Daten ###########
-items <- read_csv(file="./Data/items3.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items4.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_factor(),
   author=col_factor(),
