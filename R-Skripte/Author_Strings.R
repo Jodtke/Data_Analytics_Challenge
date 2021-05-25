@@ -23,7 +23,7 @@ joined_oR$main.topic[joined_oR$main.topic == "WZSN"] # ziemlich viele Fälle!
 ## Trimmen der Main Topics auf max. 3 Stellen mit str_trunc des strinR Package aus tidyverse & sapply()
 joined_oR <- joined_oR %>%
   mutate(
-    main.topic = sapply(main.topic, function(x) if_else(nchar(x) > 3, str_trunc(x, width=3), x)),
+    main.topic = sapply(main.topic, function(x) if_else(nchar(x) > 3, str_trunc(x, width=3, side="rigth", ellipsis=""), x)),
     main.topic = as.character(main.topic)
   )
 
@@ -50,16 +50,19 @@ head(joined_item_trans, n=20)
 
 ########## neue csv schreiben für itemliste only ########
 ## items einlesen
-items <- read.csv(file="./Data/items.csv", col.names=T)
+items <- read_delim(file="./Data/items.csv", col_names=T, delim="|", quote="")
 items2_tbl <- as_tibble(items)
 ## mainTopics auf 3 reduzieren
 items2_tbl <- items2_tbl %>%
   mutate(
-    main.topic = sapply(main.topic, function(x) if_else(nchar(x) > 3, str_trunc(x, width=3), x)),
+    main.topic = sapply(`main topic`, function(x) if_else(nchar(x) > 3, str_trunc(x, width=3, side="right", ellipsis="" ), x)),
     main.topic = as.character(main.topic)
-  )
+  ) %>%
+  select(-`main topic`)
 ## überprüfen
 items2_tbl %>% filter(nchar(main.topic) > 3)
+items2_tbl %>% filter(nchar(main.topic) == "...")
+head(items2_tbl, n=20)
 ## neue items2.csv schreiben
 write_csv(items2_tbl, file="./Data/items2.csv", col_names=T)
 ## testweise einlesen
@@ -69,7 +72,7 @@ items2 <- read_csv(file="./Data/items2.csv", col_names=T)
 mainTopic_trimmer <- function(x) {
   for (idx in 1:length(x)) {
     if (nchar(idx) > 3) {
-      str_trunc(idx, width=3)
+      str_trunc(idx, width=3, side="right", ellipsis="")
     } else {
       idx = idx
     }

@@ -14,26 +14,31 @@ library(cluster)
 getwd()
 
 ########### Daten ###########
-joined_item_trans <- read_csv(file = "./Data/joined_item_trans.csv", col_names = T, col_types = cols(
+items <- read_csv(file="./Data/items3.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),
   publisher=col_character(),
   main.topic=col_character(),
-  subtopics=col_character(),
-  sessionID=col_factor(),
-  click=col_integer(),
-  basket=col_integer(),
-  order=col_integer()
+  subtopics=col_character()
 ))
-head(joined_item_trans, n=10)
-glimpse(joined_item_trans)
-## Reihenfolge der Spalten verändern
+head(items, n=20)
+glimpse(items)
+
+trans <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
+  sessionID = col_factor(),
+  itemID = col_factor(),
+  click = col_integer(),
+  basket = col_integer(),
+  order = col_integer()
+))
+## joinen & Reihenfolge der Spalten verändern
+joined_item_trans <- left_join(items, trans, by="itemID")
 joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
 head(joined_item_trans, n=10)
 
 ## durchschnittliche Click-Order-Ratio pro Item berechnen
-joined_item_trans$click_order_ratio <- joined_item_trans$click / joined_oR$order
+joined_item_trans$click_order_ratio <- joined_item_trans$click / joined_item_trans$order
 joined_item_trans$click_order_ratio <- sapply(joined_item_trans$click_order_ratio, function(x) ifelse(x=="Inf" | x=="NaN", 0, x))
 ## durchschnittliche Basket-Order-Ration pro Item berechnen
 joined_item_trans$basket_order_ratio <- joined_item_trans$basket / joined_item_trans$order
@@ -62,11 +67,11 @@ summary(tibble_with_ratios)
 
 ## an 'numerischen' Factor itemID den Zusatz 'IID' hängen, damit später keine Probleme auftreten beim umwandeln in Zeilen-und Spaltennamen der Matrix
 tibble_with_ratios$itemID <- as.factor(paste0("IID.", tibble_with_ratios$itemID))
-tibble_with_ratios[, c(2:4) ] <- lapply(tibble_with_ratios[, c(2:4) ], FUN = factor)
+tibble_with_ratios[, c(2:4) ] <- lapply(tibble_with_ratios[, c(2:4) ], FUN=factor)
 head(tibble_with_ratios, n=20)
 
 # unnötige datensätze löschen
-rm(openRefine, oR_tbl, transactions_raw, transactions_tbl)
+rm(items, trans)
 
 ####### Dissimilarity zwischen den Büchern berechnen #######
 ## Cluster-Package einladen & auf Similarity zwischen Author, Verlag und MainTopic überprüfen mit 'Gower'-Distanz
