@@ -23,8 +23,15 @@ oR_tbl <- as_tibble(openRefine)
 dim(oR_tbl)
 evaluation_tbl <- as_tibble(evaluation)
 
+##
+save1 <- openRefine %>% filter(author == "") %>% group_by(publisher) %>% summarise(n=n())
+openRefine %>% filter(publisher=="Ars Edition Gmbh") %>% filter(author =="")
+save1 <- as.numeric(save1$n)
+hist(save1)
+
 ##check how many items with NAs in items_5 are in evaluation dataset
-authorNAs <- oR_tbl %>% filter(author == "")
+authorNAs <- oR_tbl %>% filter(author == "") %>% group_by(publisher) %>% summarise(oR_tbl, n=n())
+authorNAs
 dim(authorNAs)
 view(authorNAs)
 author_bearb <- right_join(authorNAs, evaluation_tbl)
