@@ -60,8 +60,14 @@ tibble_with_ratios <- joined_item_trans %>%
   filter(as.numeric(sum_orders)>0)
 head(tibble_with_ratios, n=20)
 
+## Books Features extra abspeichern
 books_features <- data.frame(tibble_with_ratios[, c("itemID", "author", "main_topic", "publisher", "mean_click_order_ratio", "mean_basket_order_ratio") ] )
 head(books_features, n=10)
+
+## unwichtige datensätze entfernen
+rm(items, trans, tibble_with_ratios)
+
+######### Distanz-Matrix mit Gower-Distanz erstellen (und daisy-package) ############
 features_dist <- daisy(books_features, metric="gower", weights=c(0.5, 1.25, 1.5, 0.25, 1, 0.75))
 features_distMatrix <- as.matrix(features_dist)
 
