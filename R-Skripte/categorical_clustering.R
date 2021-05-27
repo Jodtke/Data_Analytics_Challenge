@@ -61,14 +61,14 @@ tibble_with_ratios <- joined_item_trans %>%
 head(tibble_with_ratios, n=20)
 
 ## Books Features extra abspeichern
-books_features <- data.frame(tibble_with_ratios[, c("itemID", "author", "main_topic", "publisher", "mean_click_order_ratio", "mean_basket_order_ratio") ] )
+books_features <- data.frame(tibble_with_ratios[, c("author", "publisher") ] )
 head(books_features, n=10)
 
 ## unwichtige datensätze entfernen
-rm(items, trans, tibble_with_ratios)
+rm(items, trans)
 
 ######### Distanz-Matrix mit Gower-Distanz erstellen (und daisy-package) ############
-features_dist <- daisy(books_features, metric="gower", weights=c(0.5, 1.25, 1.5, 0.25, 1, 0.75))
+features_dist <- daisy(books_features, metric="gower", weights=c(2, 0.5))
 features_distMatrix <- as.matrix(features_dist)
 
 ## visualize matrix --> kaum möglich mit 211 MB Matrix!!!!
@@ -82,30 +82,59 @@ features_distMatrix <- as.matrix(features_dist)
 # anzahl der cluster mit maximalem score (also höchster gleichheit innerhlab der cluster) wird gewählt für anzahl der cluster
 
 ########## silhouette methode ##########
-number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=25, method="median", index="silhouette", alphaBeale=0.1)
+number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=50, method="centroid", index="silhouette")
+# wenn keine numerischen Gewichtungsfaktoren in Distanzmatrix einberechnet werden 6 Cluster empfohlen
+# wenn numerische Variablen inbegriffen (=Ratios!) werden nur 2 Cluster empfohlen
+# Vermutung Eric: wahrscheinlich besitzen so wenige Items überhaupt eine zu berechnende Ratio, dass an dieser Stelle nahezu binäre 0 und >0 Entscheidung
+# zur Clusterung in nur 2 Cluster getroffen wird
+# mögliche Verbesserung: Gewichtung der Ratios verringern!
 
 # PAM anwenden
-features_pam <- pam(features_distMatrix, 2)
+features_pam <- pam(features_distMatrix, 6)
 
 # visualize pam
-features_mds <- as.data.frame(cmdscale(features_dist, 2))
-features_mds <- features_mds %>% rename(disCluster1=V1, disCluster2=V2)
-features_mds$features_cluster <- as.factor(features_pam$clustering)
-ggplot(features_mds, aes(x=disCluster1, y=disCluster2, color=features_cluster)) + 
+features_mds6 <- as.data.frame(cmdscale(features_dist, 6))
+features_mds6 <- features_mds6 %>% rename(disCluster1=V1, disCluster2=V2, disCluster3=V3, disCluster4=V4, disCluster5=V5, disCluster6=V6)
+features_mds6$features_cluster <- as.factor(features_pam$clustering)
+#### Achtung Variablen umbauen
+features_mds6$itemID <- books_features$itemID # itemId an features_mds6 hängen
+books_withClusters <- books_features # neuen Datensatz bauen für joining
+books_withClusters <- left_join(x=books_withClusters, y=features_mds6, by="itemID")
+head(books_withClusters, n=20)
+
+# plot zu groß ):
+ggplot(books_withClusters, aes(x=disCluster1, y=disCluster3, color=features_cluster)) + 
   geom_point() +
   theme_minimal() +
   labs(title="Cluster Plot for Similarities",
        subtitle="Colored by PAM cluster") +
   scale_color_brewer(palette="Set1")
 
-# interpretation
-books_features <- books_features %>%
+# umwandlung von books_withClusters
+books_withClusters <- books_withClusters %>%
   mutate(
-    disCluster1 = round(features_mds$disCluster1, digit=2),
-    disCluster2 = round(features_mds$disCluster2, digit=2),
-    cluster = as.factor(features_mds$features_cluster)
+    disCluster1 = round(books_withClusters$disCluster1, digit=2),
+    disCluster2 = round(books_withClusters$disCluster2, digit=2),
+    disCluster3 = round(books_withClusters$disCluster3, digit=2),
+    disCluster4 = round(books_withClusters$disCluster4, digit=2),
+    disCluster5 = round(books_withClusters$disCluster5, digit=2),
+    disCluster6 = round(books_withClusters$disCluster6, digit=2),
+    cluster = as.factor(books_withClusters$features_cluster)
   )
-head(books_features, n=20)
+head(books_withClusters, n=20)
+
+# umwandlung von feature_mds6
+features_mds6 <- features_mds6 %>%
+  mutate(
+    disCluster1 = round(features_mds6$disCluster1, digit=2),
+    disCluster2 = round(features_mds6$disCluster2, digit=2),
+    disCluster3 = round(features_mds6$disCluster3, digit=2),
+    disCluster4 = round(features_mds6$disCluster4, digit=2),
+    disCluster5 = round(features_mds6$disCluster5, digit=2),
+    disCluster6 = round(features_mds6$disCluster6, digit=2),
+    cluster = as.factor(features_mds6$features_cluster)
+  )
+head(features_mds6, n=20)
 
 ########### zweiter Ansatz ############
 silhouette <- c()
