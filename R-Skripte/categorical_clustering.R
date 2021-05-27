@@ -57,18 +57,18 @@ tibble_with_ratios <- joined_item_trans %>%
     mean_basket_order_ratio = as.factor(mean_basket_order_ratio)
     ) %>%
   distinct(.keep_all=T) %>%
-  filter(as.numeric(sum_orders)>0)
+  filter(as.numeric(sum_clicks)>0)
 head(tibble_with_ratios, n=20)
 
 ## Books Features extra abspeichern
-books_features <- data.frame(tibble_with_ratios[, c("author", "publisher") ] )
+books_features <- data.frame(tibble_with_ratios[1:20000, c("author", "main_topic", "publisher") ] )
 head(books_features, n=10)
 
 ## unwichtige datensätze entfernen
 rm(items, trans)
 
 ######### Distanz-Matrix mit Gower-Distanz erstellen (und daisy-package) ############
-features_dist <- daisy(books_features, metric="gower", weights=c(2, 0.5))
+features_dist <- daisy(books_features, metric="gower", weights=c(2, 1.5, 0.25))
 features_distMatrix <- as.matrix(features_dist)
 
 ## visualize matrix --> kaum möglich mit 211 MB Matrix!!!!
@@ -82,7 +82,7 @@ features_distMatrix <- as.matrix(features_dist)
 # anzahl der cluster mit maximalem score (also höchster gleichheit innerhlab der cluster) wird gewählt für anzahl der cluster
 
 ########## silhouette methode ##########
-number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=50, method="centroid", index="silhouette")
+number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=50, method="median", index="silhouette")
 # wenn keine numerischen Gewichtungsfaktoren in Distanzmatrix einberechnet werden 6 Cluster empfohlen
 # wenn numerische Variablen inbegriffen (=Ratios!) werden nur 2 Cluster empfohlen
 # Vermutung Eric: wahrscheinlich besitzen so wenige Items überhaupt eine zu berechnende Ratio, dass an dieser Stelle nahezu binäre 0 und >0 Entscheidung
