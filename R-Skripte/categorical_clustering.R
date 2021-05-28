@@ -44,6 +44,7 @@ glimpse(joined_item_trans, n=10)
 tibble_with_ratios <- joined_item_trans %>%
   group_by(itemID) %>%
   summarise(
+    title = title,
     author = author,
     main_topic = main.topic,
     publisher = publisher,
@@ -61,14 +62,14 @@ tibble_with_ratios <- joined_item_trans %>%
 head(tibble_with_ratios, n=20)
 
 ## Books Features extra abspeichern
-books_features <- data.frame(tibble_with_ratios[1:20000, c("author", "main_topic", "publisher") ] )
+books_features <- data.frame(tibble_with_ratios[1:20000, c("title", "author", "main_topic") ] )
 head(books_features, n=10)
 
 ## unwichtige datensätze entfernen
 rm(items, trans)
 
 ######### Distanz-Matrix mit Gower-Distanz erstellen (und daisy-package) ############
-features_dist <- daisy(books_features, metric="gower", weights=c(2, 1.5, 0.25))
+features_dist <- daisy(books_features, metric="gower", weights=c(2, 1.5, 1))
 features_distMatrix <- as.matrix(features_dist)
 
 ## visualize matrix --> kaum möglich mit 211 MB Matrix!!!!
