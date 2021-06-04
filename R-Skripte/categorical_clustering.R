@@ -2,7 +2,9 @@
 library(tidyverse)
 library(cluster)
 library(NbClust)
-library(parallel)
+library(fclust)
+library(ppclust)
+library(factoextra)
 
 ## Arbeitsverzeichnis
 getwd()
