@@ -2,7 +2,10 @@
 library(tidyverse)
 library(cluster)
 library(NbClust)
-library(parallel)
+library(fclust)
+library(ppclust)
+library(diceR)
+library(factoextra)
 
 ## Arbeitsverzeichnis
 getwd()
@@ -44,6 +47,7 @@ glimpse(joined_item_trans, n=10)
 tibble_with_ratios <- joined_item_trans %>%
   group_by(itemID) %>%
   summarise(
+    title = title,
     author = author,
     main_topic = main.topic,
     publisher = publisher,
@@ -57,19 +61,24 @@ tibble_with_ratios <- joined_item_trans %>%
     mean_basket_order_ratio = as.factor(mean_basket_order_ratio)
     ) %>%
   distinct(.keep_all=T) %>%
-  filter(as.numeric(sum_orders)>0)
+  filter(as.numeric(sum_clicks)>0)
 head(tibble_with_ratios, n=20)
 
 ## Books Features extra abspeichern
-books_features <- data.frame(tibble_with_ratios[, c("author", "publisher") ] )
+books_features <- data.frame(tibble_with_ratios[1:20000, c("title", "author", "publisher", "main_topic", "sum_clicks", "sum_orders") ] )
 head(books_features, n=10)
 
 ## unwichtige datensätze entfernen
 rm(items, trans)
 
 ######### Distanz-Matrix mit Gower-Distanz erstellen (und daisy-package) ############
-features_dist <- daisy(books_features, metric="gower", weights=c(2, 0.5))
+features_dist <- daisy(books_features, metric="gower", weights=c(2, 2, 1, 1.5, 1, 1))
 features_distMatrix <- as.matrix(features_dist)
+
+### Paare finden in books features DataFrame
+summary(features_dist) # viele unähnlichkeiten, im 1.Quantil ganze 76% Dissimilarity ):
+books_features[ which(
+    features_distMatrix==min(features_distMatrix[ features_distMatrix!=min(features_distMatrix) ] ), arr.ind=T) [1, ], ]
 
 ## visualize matrix --> kaum möglich mit 211 MB Matrix!!!!
 #gradient_color <- list(low="gold", high="black")
@@ -82,7 +91,7 @@ features_distMatrix <- as.matrix(features_dist)
 # anzahl der cluster mit maximalem score (also höchster gleichheit innerhlab der cluster) wird gewählt für anzahl der cluster
 
 ########## silhouette methode ##########
-number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=50, method="centroid", index="silhouette")
+number_clusters <- NbClust(diss=features_dist, distance=NULL, min.nc=2, max.nc=25, method="median", index="silhouette")
 # wenn keine numerischen Gewichtungsfaktoren in Distanzmatrix einberechnet werden 6 Cluster empfohlen
 # wenn numerische Variablen inbegriffen (=Ratios!) werden nur 2 Cluster empfohlen
 # Vermutung Eric: wahrscheinlich besitzen so wenige Items überhaupt eine zu berechnende Ratio, dass an dieser Stelle nahezu binäre 0 und >0 Entscheidung
@@ -137,14 +146,21 @@ features_mds6 <- features_mds6 %>%
 head(features_mds6, n=20)
 
 ########### zweiter Ansatz ############
-silhouette <- c()
-silhouette = c(silhouette, NA)
-for (i in 2:25) {
-  pam_clusters = pam(as.matrix(features_dist), diss=T, k=i)
+silhouette <- c(NA)
+for (i in 2:50) {
+  pam_clusters = pam(features_dist, diss=T, k=i)
   silhouette = c(silhouette, pam_clusters$silinfo$avg.width)
 }
-plot(1:15, silhouette,
+plot(2:50, silhouette,
       xlab = "Clusters",
       ylab = "Silhouette Width")
-lines(1:15, silhouette)
+lines(2:50, silhouette)
+
+
+
+############## fuzzy c-means clustering ##############
+
+
+
+
 
