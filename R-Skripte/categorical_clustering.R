@@ -72,7 +72,7 @@ head(books_features, n=10)
 rm(items, trans)
 
 ######### Distanz-Matrix mit Gower-Distanz erstellen (und daisy-package) ############
-features_dist <- daisy(books_features, metric="gower", weights=c(2, 2, 1, 1.5, 1, 1))
+features_dist <- daisy(books_features, metric="gower", weights=c(2, 2, 1, 1.5, 1, 1), type=list(ordratio=c(5,6)))
 features_distMatrix <- as.matrix(features_dist)
 
 ### Paare finden in books features DataFrame
