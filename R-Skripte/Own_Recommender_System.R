@@ -42,10 +42,10 @@ library(tidyverse)
 
 #items3 <- read.csv("./Data/items3.csv")
 
-items5 <- read.csv("./Data/items5.csv")
+items6 <- read.csv("./Data/items6.csv")
 
 # Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Genre
-AuthMat <- items5 %>% 
+AuthMat <- items6 %>% 
   group_by(author, main.topic) %>% 
   dplyr::summarise(n = n()) %>% 
   spread(key = main.topic, value = n)
@@ -130,7 +130,7 @@ within.ss <- rep(NA,30)
 for (k in 1:30){
   kmeans_result <- kmeans(AuthMat0sparse, centers = k, iter.max = 50, algorithm = "MacQueen")
   within.ss[k] <- sum(kmeans_result$withinss)
-  print(paste("Just finished k =", k))
+  print(paste0("Just finished k =", k))
 }
 
 #### Elbow criterion / method to visually find the optimal number of clusters
@@ -347,7 +347,7 @@ object.size(CosineSparse)
 
 DimNamesCos <- dimnames(CosineSparse)
 
-writeMM(CosineSparse, file = "CosineSimOhneNullen.mtx")
+writeMM(CosineSparse, file = "./Data/CosineSimOhneNullen.mtx")
 # ACHTUNG: Das File liegt nicht im Order Data sondern im Oberordner!
 # Leider kann das File nicht auf GitHub hochgeladen werden, da es das Filesize
 # Limit von 100 MB überschreitet.
@@ -480,10 +480,10 @@ sum( (AuthMat0sparse[1,] != 0) + (AuthMat0sparse[2,] != 0) )
 evaluation <- read.csv("./Data/evaluation.csv")
 
 # Verknüfung von Evaluation mit den Items, um die Autorennamen zuzuordnen
-items5 <- read.csv("./Data/items5.csv")
+items6 <- read.csv("./Data/items6.csv")
 
 activeAuthorAndTitel <- evaluation %>% 
-  left_join(items5, by = "itemID") %>% 
+  left_join(items6, by = "itemID") %>% 
   select(itemID, author, title)
 
 #rm(items5)
@@ -545,14 +545,14 @@ activeTitel1
 # in Spalte 1 hinzufgen und die Spalte 2 in 'text' umbenennen
 
 # Extrahieren aller Buchtitel des Ziel-Autors, außer des Ziel-Titels
-allTitelActAuth1 <- items5 %>% 
+allTitelActAuth1 <- items6 %>% 
   select(itemID, author, title) %>% 
   filter(author == activeAuthor1 & title != activeTitel1) %>% 
   select(itemID, title) %>% 
   rename(doc_id = itemID, text = title)
 
 # Extrahieren aller Buchtitel der kNN
-allTitelKNN <- items5 %>% 
+allTitelKNN <- items6 %>% 
   select(itemID, author, title) %>% 
   filter(str_detect(.$author, paste(aA1_top10NeigbhorsCos, collapse = "|"))) %>% 
   select(itemID, title) %>% 
@@ -561,7 +561,7 @@ allTitelKNN <- items5 %>%
 # Jetzt müssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
 # zusammengeführt und die doc_id entsprechend vergeben werden
 
-activeTitel1 <- items5 %>% 
+activeTitel1 <- items6 %>% 
   select(itemID, title) %>% 
   filter(title == activeTitel1) %>% 
   rename(doc_id = itemID, text = title)
