@@ -8,8 +8,6 @@ crude <- tm_map(crude, content_transformer(tolower))
 crude <- tm_map(crude, removeWords, stopwords("english"))
 crude <- tm_map(crude, stemDocument)
 
-
-
 # change 3 into whatever you need for a differenct n-gram
 NLPtrigramTokenizer <- function(x) {
   unlist(lapply(ngrams(words(x), 3), paste, collapse = " "), use.names = FALSE)
