@@ -162,7 +162,7 @@ Function_no_tr_daten <- function(active_book){
   this_author <- selected_features$author         #als chr darstellen 
   this_publisher <- selected_features$publisher
   this_genre <- selected_features$main.topic
-  items_select <- oR_tbl %>% filter(author==this_author| publisher ==this_publisher & main.topic == this_genre)#filter einsetzen
+  items_select <- oR_tbl %>% filter(author==this_author | publisher==this_publisher & main.topic==this_genre)#filter einsetzen
   #nimm_5 <- sample_n(auth_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
   items_select <- items_select$itemID              #extrahieren alle potential recommendations
   return(items_select)

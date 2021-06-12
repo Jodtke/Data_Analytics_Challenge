@@ -31,8 +31,8 @@ trans <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_
   order = col_integer()
 ))
 ### joinen & Reihenfolge der Spalten verändern
-joined_item_trans <- left_join(items, trans, by="itemID")
-joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
+joined_item_trans <- left_join(trans, items, by="itemID")
+joined_item_trans <- joined_item_trans[, c(1:8, 10, 9) ]
 head(joined_item_trans, n=10)
 
 ### evaluation datensatz
@@ -115,16 +115,16 @@ features_mds6$features_cluster <- as.factor(features_pam$clustering)
 ### doppelt sessions und sessions mit min 2 Büchern 
 dup.ses <- joined_item_trans[joined_item_trans$sessionID %in%
                                joined_item_trans$sessionID[duplicated(joined_item_trans$sessionID) ] ,] # das sind knapp 183k sessions
-length(unique(dup.ses$itemID)) # für 67896 Bücher würde das funktionieren
+length(unique(dup.ses$itemID)) # für 14.471 Bücher würde das funktionieren
 ## prüfen wie viel Bücher von denen, die in transaction DS drin sind, auch in evaluation DS erscheinen.
 #O b das Sinn macht der Algorithmus zu basteln und der Ansatz zu implimentieren 
 pruff_ses <- right_join(dup.ses, evaluation_tbl, by = "itemID")
 # view(pruff_ses %>% group_by(itemID))
-length(unique(pruff_ses$itemID))
+length(unique(pruff_ses$itemID)) # 1000 items aus evaluation datensatz
 pruff_ses <- drop_na(pruff_ses)  
 pruff_ses %>% group_by(itemID) %>% summarise(n=n()) %>% arrange(desc(n)) # 304 Bücher in DS evaluation
 # einzelne items (ohne duplikate) aus ludmilas itemliste extrahieren
-ludmilas_titles <- pruff_ses %>%
+ludmilas_titles <- pruff_ses %>% # alternativ: pruf_ses einsetzen und "nur" 301 Bücher in ludmilas titles haben
   group_by(itemID) %>%
   summarise(title = title) %>%
   distinct(.keep_all = T) %>%
@@ -144,8 +144,8 @@ parallelStartSocket(cpus = detectCores())
 title_distances_lv <- stringdistmatrix(a=string_features1, b=ludmilas_titles, # Methode 'lv' = Levenstein-Clusterung
                               method="lv", useBytes=F, useNames=T) ## merkwürdiges Ergebnis, stimmen nur die Länge der Title überein?!
 title_distances_qgrams <- stringdistmatrix(a=string_features1, b=ludmilas_titles,
-                                                  method="qgram", q=5, # gqgram = 1, jeder einzelne buchstabe der strings wird miteinander vergleichen un die länge der übereinstimmung ausgegeben
-                                                  useBytes=T, useNames=T)
+                                                  method="cosine", q=4, # gqgram = 4, jede 4.buchstaben-kombination der strings wird miteinander vergleichen un die länge der übereinstimmung ausgegeben
+                                                  useBytes=F, useNames=T) # useNames und useBytes noch etwas unklar?!
 
 ### Distance-File to DataFrame Function
 title_distances_qgrams_matrix <- melt(as.matrix(title_distances_qgrams) ) # konvertierung der distance-matrix in "molten" dataFrame mit melt() aus package reshape2
