@@ -69,4 +69,23 @@ rm(items_bearb, rem_dup_word)
 # ))
 # head(items2, n=20) # hat Geklappt!
 
+################ crawler daten bearbeiten ############
+# Import der Crawler-Daten
+FCD <- readRDS("./Data/FinaleCrawlerDatenUpdated.rds")
+
+# https://stackoverflow.com/questions/49564748/extract-multiple-elements-from-a-list-of-lists-lapply
+FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15))))
+# Anzahl der NAs
+sum(is.na(FCD_tibble$Beschreibung))
+# 13732 Items haben keine Klappentexte
+
+### Tibble aus den Titeln und Beschreibungen der Klappentexte erstellen
+FCD_tibble <- FCD_tibble %>% 
+  rename(title = Titel) %>% 
+  mutate(title = unlist(title)) %>% 
+  mutate(Beschreibung = unlist(Beschreibung))
+rm(FCD)
+head(FCD_tibble, n=20)
+
+
 
