@@ -87,5 +87,23 @@ FCD_tibble <- FCD_tibble %>%
 rm(FCD)
 head(FCD_tibble, n=20)
 
+### crawler daten an itemliste anpassen
+FCD_tibble[, 1:2] <- sapply(X=FCD_tibble[, 1:2], FUN=function(x) str_conv(string=x, encoding="UTF-8"), USE.NAMES=F)
+### whitespace von beiden seiten entfernen
+FCD_tibble[, 1:2] <- apply(X=FCD_tibble[, 1:2], MARGIN=2, FUN=function(x) str_trim(string=x, side="both"))
+### alle strings in Großbuchstaben darstellen
+FCD_tibble[, 1:2] <- sapply(X=FCD_tibble[, 1:2], FUN=function(x) str_to_lower(string=x, locale="de"), USE.NAMES=F) # locale="english" im default...besser als Deutsch?
+### komische sonderzeichen ersetzen durch "" 
+FCD_tibble[, 1:2] <- sapply(X=FCD_tibble[, 1:2], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""), USE.NAMES=F)
+#items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:alnum:]]", replacement=" "))
+head(FCD_tibble, n=20)
 
+### als eigene csv-Datei abspeichern
+#write_csv(FCD_tibble, file="./Data/KlappentexteUndTitel.csv", col_names=T)
+### testweise einlesen
+# FCD_tibble2 <- read_csv(file="./Data/KlappentexteUndTitel.csv", col_names=T, col_types=cols(
+#    title=col_character(),
+#    Beschreibung=col_character()
+# ))
+# head(FCD_tibble2, n=20) # hat Geklappt!
 
