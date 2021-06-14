@@ -17,8 +17,8 @@ items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
   main.topic=col_factor(),
   subtopics=col_character()
 ))
-head(items, n=20)
-glimpse(items)
+#head(items, n=20)
+#glimpse(items)
 
 trans <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
   sessionID = col_factor(),
@@ -30,7 +30,7 @@ trans <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_
 ## joinen & Reihenfolge der Spalten verändern
 joined_item_trans <- left_join(items, trans, by="itemID")
 joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
-head(joined_item_trans, n=10)
+#head(joined_item_trans, n=10)
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
 #dim(transactions_raw)  #365 143 x 5
 openRefine <- read.csv(file = "./Data/items6.csv", header = T, sep = ",", row.names = NULL, stringsAsFactors = F, encoding = "UTF-8")
@@ -86,15 +86,15 @@ length(unique(dup.ses$itemID)) #für 14471 Bücher würde das funktionieren
 
 #Recommendation Function based on sessionID
 #für 1 Buch erstmal 
-Recommendation_function <- function(active_book){
+Recommendation_function <- function(activeItem){
   this_ses <- dup.ses %>% group_by(sessionID) %>%   
-    filter(itemID==active_book) %>% select(sessionID)
+    filter(itemID==activeItem) %>% select(sessionID)
   if (nrow(this_ses) == 0){
     return(list())
   }
   this_ses <- this_ses$sessionID
   this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID) 
-  potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != active_book)%>% 
+  potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItem)%>% 
     summarise(nClick=sum(click),nBasket=sum(basket),norder=sum(order)) %>%
     arrange(desc(nClick))
   potential_recommendations <- top5$itemID
@@ -116,8 +116,8 @@ Recommendation_function(41198)
 ################################################################################
 ###09.06.2021#############Umformung der Funktion für eine Liste#################
 ######try for random sample of books from OR_tibble#####
-set.seed(123)
-test_random <- sample_n(oR_tbl, 25)    #tibble 25 rows
+set.seed(345)
+test_random <- sample_n(oR_tbl, 1)    #tibble 25 rows
 books <- as.list(test_random$itemID)   #
 result <- list()
 for (i in 1:length(books)){
@@ -153,8 +153,8 @@ result
 
 
 ###Funktion#####
-Function_no_tr_daten <- function(active_book){
-  selected_features <- oR_tbl %>% filter(itemID==active_book) %>%
+Function_no_tr_daten <- function(activeItem){
+  selected_features <- oR_tbl %>% filter(itemID==activeItem) %>%
     select(itemID,author,main.topic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
   if (nrow(selected_features) == 0){
     return(list())
@@ -178,3 +178,29 @@ for (i in 1:length(result)){
   }
 }
 result
+################################################################################
+#simulate recommendation for ActiveItem # 76465
+TM_Alg_Recommend <- result
+
+##result 2 is output from Simularity, die wir von Subtopics berechnet haben, hier hypotesisch
+activeItem <- 76465
+result2 <- list(c(34371, 66167, 35154, 35726, 36013, 37525, 50382, 50951))
+names(result2) <- activeItem
+result2
+
+Subt_TM_Recommend <- result2
+
+#result3 is output die Bücher die zusammen in sessions waren, auch hypotesisch 
+result3 <- list(c(39430, 66167, 255,  1421,  4077))
+names(result3) <- activeItem
+result3
+
+Transact_Recommend <- result3
+
+#merge all potential recommendatons into one list #unter einem Name ist active item und unten alle potential recommend
+all_potential_recom <- Map(c, TM_Alg_Recommend, Subt_TM_Recommend,Transact_Recommend) 
+
+#TM_Alg_Recommend output vergleich mit Subt_TM_Recommend output und Transact_Recommend output
+
+count_table <- as.data.frame(table(all_potential_recom))
+count_table %>% select(all_potential_recom, Freq) %>% arrange(Freq)
