@@ -32,15 +32,17 @@ library(tm)
 
 #items3 <- read.csv("./Data/items3.csv")
 
-items5 <- read.csv("./Data/items5.csv", encoding = "UTF-8")
+# items5 <- read.csv("./Data/items5.csv", encoding = "UTF-8")
 
 #items6 <- read.csv("./Data/items6.csv", encoding = "UTF-8")
 
+items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
+
 # Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Genre
-AuthMat <- items5 %>% 
-  group_by(author, main.topic) %>% 
+AuthMat <- items7 %>% 
+  group_by(author, mainTopic) %>% 
   dplyr::summarise(n = n()) %>% 
-  spread(key = main.topic, value = n)
+  spread(key = mainTopic, value = n)
 
 # Autorennamen abspeichern, da diese später als rownames eingefügt werden
 Authors <- AuthMat$author
@@ -131,20 +133,20 @@ object.size(CosineSparse)
 # dessen kNearestNeighbors sowie deren geschriebene Bücher ausgeben lassen.
 
 # Import von Items
-items5 <- read.csv("./Data/items5.csv", encoding = "UTF-8")
+items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
 
-items5[duplicated(items5$title),] %>% nrow()
+items7[duplicated(items7$title),] %>% nrow()
 # haben 6474 Titel die gleich hei?en - m?ssen wir rausschmei?en
 
 # Die Subtopics, die nur [] sind, sollen durch NAs ersetzt werden
-#subtopics <- ifelse(items5$subtopics == "[]", NA, items5$subtopics)
-#items5$subtopics <- subtopics
+#subtopics <- ifelse(items7$subtopics == "[]", NA, items7$subtopics)
+#items7$subtopics <- subtopics
 #sum(is.na(subtopics))
 # 33643 Items haben keine Subtopics
 
 # Remove duplicates
-#items5 <- items5 %>% distinct(title, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
-#items5titleSubTop <- items5 %>% distinct(title, subtopics, .keep_all = TRUE) # schmei?t nur die mit gleichem titel und gleiche Subtopics raus
+#items7 <- items7 %>% distinct(title, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
+#items7titleSubTop <- items7 %>% distinct(title, subtopics, .keep_all = TRUE) # schmei?t nur die mit gleichem titel und gleiche Subtopics raus
 
 # DARF MAN SO NICHT MACHEN!!! Sonst fliegen auch ItemIDs raus, die in Evaluation sind. Man kann dann nicht mehr joinen -.-'
 
@@ -154,14 +156,54 @@ transactions <- as.tibble(read.csv("./Data/transactions.csv", header = T, sep = 
 # Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
 # die ausgibt, ob ein Item in Transactions vorkommt
 
-joined_oR <- left_join(transactions, items5, by = "itemID")
+joined_oR <- left_join(transactions, items7, by = "itemID")
 
-itemsInTrans <- joined_oR %>% select(itemID) %>% unique() %>% mutate(inTransactions = TRUE)
-itemsWithTrans <- items5 %>% left_join(itemsInTrans, by = "itemID")
-itemsWithTrans$inTransactions[is.na(itemsWithTrans$inTransactions)] <- FALSE
+itemsInTrans <- joined_oR %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(inTransactions = TRUE)
 
 #sum(itemsWithTrans$inTransactions)
 # sind 24909 Items
+
+totalInfo <- items7 %>% left_join(itemsInTrans, by = "itemID")
+totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
+
+# Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
+# die ausgibt, ob ein Item mindestens einmal angeklickt wurde
+
+clicked <- joined_oR %>% 
+  filter(click > 0) %>%
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(clicked = TRUE)
+
+totalInfo <- totalInfo %>% left_join(clicked, by = "itemID")
+totalInfo$clicked[is.na(totalInfo$clicked)] <- FALSE
+
+# Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
+# die ausgibt, ob ein Item mindestens einmal in den Warenkorb gelegt wurde
+
+basket <- joined_oR %>%
+  filter(basket > 0) %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(basket = TRUE)
+
+totalInfo <- totalInfo %>% left_join(basket, by = "itemID")
+totalInfo$basket[is.na(totalInfo$basket)] <- FALSE
+
+# Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
+# die ausgibt, ob ein Item mindestens einmal gekauft wurde
+
+ordered <- joined_oR %>%
+  filter(order > 0) %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(ordered = TRUE)
+
+totalInfo <- totalInfo %>% left_join(ordered, by = "itemID")
+totalInfo$ordered[is.na(totalInfo$ordered)] <- FALSE
 
 # Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
 # die ausgibt, ob ein Item in dup.ses vorkommt
@@ -169,42 +211,45 @@ itemsWithTrans$inTransactions[is.na(itemsWithTrans$inTransactions)] <- FALSE
 dup.ses <- joined_oR[joined_oR$sessionID %in%
                        joined_oR$sessionID[duplicated(joined_oR$sessionID)],]
 
-itemsInDupSes <- dup.ses %>% select(itemID) %>% unique() %>% mutate(inDupSes = TRUE)
-itemsWithDupSes <- itemsWithTrans %>% left_join(itemsInDupSes, by = "itemID")
-itemsWithDupSes$inDupSes[is.na(itemsWithDupSes$inDupSes)] <- FALSE
+inDupSes <- dup.ses %>% select(itemID) %>% unique() %>% mutate(inDupSes = TRUE)
 
-sum(itemsWithDupSes$inDupSes)
+totalInfo <- totalInfo %>% left_join(inDupSes, by = "itemID")
+totalInfo$inDupSes[is.na(totalInfo$inDupSes)] <- FALSE
+
+#sum(itemsWithDupSes$inDupSes)
 # sind 14471
 
 # Import der Crawler-Daten
-FCD <- readRDS("./Data/FinaleCrawlerDatenUpdated.rds")
+#FCD <- readRDS("./Data/FinaleCrawlerDatenUpdated.rds")
+FCD_tibble <- as.tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
 
-# https://stackoverflow.com/questions/49564748/extract-multiple-elements-from-a-list-of-lists-lapply
-FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15))))
-
-sum(is.na(FCD_tibble$Beschreibung))
-# 13732 Items haben keine Klappentexte
-
-FCD_tibble <- FCD_tibble %>% 
-  rename(title = Titel) %>% 
-  mutate(title = unlist(title)) %>% 
-  mutate(Beschreibung = unlist(Beschreibung)) #%>% 
-#mutate(title = toupper(title)) %>% 
-#mutate(Beschreibung = toupper(Beschreibung))
+# # https://stackoverflow.com/questions/49564748/extract-multiple-elements-from-a-list-of-lists-lapply
+# FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15))))
+# 
+# sum(is.na(FCD_tibble$Beschreibung))
+# # 13732 Items haben keine Klappentexte
+# 
+# FCD_tibble <- FCD_tibble %>% 
+#    rename(title = Titel) %>% 
+#    mutate(title = unlist(title)) %>% 
+#    mutate(Beschreibung = unlist(Beschreibung)) #%>% 
+#  #mutate(title = toupper(title)) %>% 
+#  #mutate(Beschreibung = toupper(Beschreibung))
 
 # Auch hier m?ssen wir noch die duplicates raushauen
+FCD_tibble[duplicated(FCD_tibble$title),] %>% nrow()
 FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
 
 # Hinzuf?gen der Beschreibung zu items
 
-totalInfo <- itemsWithDupSes %>% 
+totalInfo <- totalInfo %>% 
   left_join(FCD_tibble, by = "title")
 
-totalInfo$subtopics <- gsub("\\[|\\]", "", totalInfo$subtopics)
-totalInfo$subtopics <- gsub(","," ", totalInfo$subtopics)
-
-totalInfo <- totalInfo %>% 
-  mutate(MainAndSub = paste(main.topic, subtopics, sep = " ")) # ACHTUNG: Hier kanne es noch zu überschneidungen kommen!
+# totalInfo$subtopics <- gsub("\\[|\\]", "", totalInfo$subtopics)
+# totalInfo$subtopics <- gsub(","," ", totalInfo$subtopics)
+# 
+# totalInfo <- totalInfo %>% 
+#   mutate(MainAndSub = paste(main.topic, subtopics, sep = " ")) # ACHTUNG: Hier kanne es noch zu überschneidungen kommen!
 
 #SubTopAndBeschr <- itemsUndBeschreibung %>% 
 #  filter(!is.na(subtopics) & !is.na(Beschreibung) )
@@ -216,20 +261,19 @@ totalInfo <- totalInfo %>%
 # So kann man immerhin ?ber die Titel die Similarity bestimmen, wenn kein
 # Klappentext verf?gbar ist
 
-itemsUndBeschreibung <- totalInfo %>% 
-  mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " ")) %>% 
-  select(itemID, author, inTransactions, inDupSes, title, titleUndBeschreibung)
+totalInfo <- totalInfo %>% 
+  mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
 
-#rm(items5)
+#rm(items7)
 
 # Laden des Evaluationsdatensatz
 evaluation <- read.csv("./Data/evaluation.csv")
 
 activeAuthorAndTitel <- evaluation %>% 
-  left_join(itemsUndBeschreibung, by = "itemID")
+  left_join(totalInfo, by = "itemID")
 
 # test <- evaluation %>% 
-#   left_join(items5, by = "itemID") %>% 
+#   left_join(items7, by = "itemID") %>% 
 #   select(itemID, author, title)
 # 
 # SimIsOne <- rep(NA,nrow(test))  
@@ -307,21 +351,21 @@ TM_Recommendations <- function(activeItem){
     # in Spalte 1 hinzufgen und die Spalte 2 in 'text' umbenennen
     
     # Extrahieren aller Buchtitel des Ziel-Autors, außer des Ziel-Titels
-    allTitelActAuth1 <- itemsUndBeschreibung %>% 
+    allTitelActAuth1 <- totalInfo %>% 
       filter(author == activeAuthor1 & title != activeTitel1) %>% 
       select(itemID, titleUndBeschreibung) %>% 
       rename(doc_id = itemID, text = titleUndBeschreibung)
     
     # Extrahieren aller Buchtitel der kNN
-    allTitelKNN <- itemsUndBeschreibung %>% 
-      filter(str_detect(.$author, paste(aA1_top10NeigbhorsCos, collapse = "|"))) %>%
+    allTitelKNN <- totalInfo %>% 
+      filter(author %in% aA1_top10NeigbhorsCos) %>% 
       select(itemID, titleUndBeschreibung) %>% 
       rename(doc_id = itemID, text = titleUndBeschreibung)
     
     # Jetzt müssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
     # zusammengeführt und die doc_id entsprechend vergeben werden
     
-    activeTitel1MitBeschreibung <- itemsUndBeschreibung %>% 
+    activeTitel1MitBeschreibung <- totalInfo %>% 
       filter(title == activeTitel1) %>% 
       select(itemID, titleUndBeschreibung) %>% 
       rename(doc_id = itemID, text = titleUndBeschreibung)
@@ -385,10 +429,11 @@ TM_Recommendations <- function(activeItem){
     top5Recc <- sort(CosineTitel[as.character(activeTitel1MitBeschreibung$doc_id),], decreasing = TRUE)
     #top5Recc <- sort(CosineTitel["45274",], decreasing = TRUE)
     top5Recc <- top5Recc[names(top5Recc) != as.character(activeTitel1MitBeschreibung$doc_id)]#[1:5]
+    topRecc <- top5Recc[top5Recc != 0]
     #top5Recc <- top5Recc[names(top5Recc) != "45274"][1:5]
     
-    print(paste("For Item", activeTitel1, "the top 5 Recommendations are:", sep = " "))
-    return(top5Recc)
+    print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
+    return(topRecc)
     
   } else {
     
@@ -396,7 +441,10 @@ TM_Recommendations <- function(activeItem){
     #DupSesactiveAuthorAndTitel <- activeAuthorAndTitel %>% filter(inDupSes == TRUE)
     #DupSesitemsUndBeschreibung <- itemsUndBeschreibung %>% filter(inDupSes == TRUE)
     
-    aA1_top10NeigbhorsCos <- sort(aA1_NeighorsCos, decreasing = TRUE)#[1:100]
+    #aA1_top10NeigbhorsCos <- sort(aA1_NeighorsCos, decreasing = TRUE)#[1:100]
+    aA1_top10NeigbhorsCos <-  aA1_NeighorsCos[aA1_NeighorsCos == 1] 
+    # ohne dieses Limit waren es bei Item 1 immer noch 4320 in all Titles
+    # mit diesem Limit nur noch 1142
     
     aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos) # nur noch deren Namen
     
@@ -414,22 +462,71 @@ TM_Recommendations <- function(activeItem){
     # in Spalte 1 hinzufgen und die Spalte 2 in 'text' umbenennen
     
     # Extrahieren aller Buchtitel des Ziel-Autors, außer des Ziel-Titels
-    allTitelActAuth1 <- itemsUndBeschreibung %>% 
+    allTitelActAuth1 <- totalInfo %>% 
       filter(author == activeAuthor1 & title != activeTitel1) %>% 
       select(itemID, titleUndBeschreibung) %>% 
       rename(doc_id = itemID, text = titleUndBeschreibung)
     
     # Extrahieren aller Buchtitel der kNN
-    allTitelKNN <- itemsUndBeschreibung %>% 
-      filter(str_detect(.$author, paste(aA1_top10NeigbhorsCos, collapse = "|"))) %>%
-      filter(inTransactions == TRUE) %>% 
+    allTitelKNN <- totalInfo %>% 
+      filter(author %in% aA1_top10NeigbhorsCos) %>% 
+      #filter(inTransactions == TRUE) %>% 
+      #filter(inDupSes == TRUE) %>% 
       select(itemID, titleUndBeschreibung) %>% 
       rename(doc_id = itemID, text = titleUndBeschreibung)
-
+    
+    # length(unique(allTitelKNN$text)) nochmal in Ruhe anschauen
+    
+    if(nrow(allTitelKNN) > 300){
+      allTitelKNN <- totalInfo %>% 
+        filter(author %in% aA1_top10NeigbhorsCos) %>% 
+        filter(clicked == TRUE | basket == TRUE | ordered == TRUE) %>% 
+        select(itemID, titleUndBeschreibung) %>% 
+        rename(doc_id = itemID, text = titleUndBeschreibung)
+    } 
+    
+    # if(nrow(allTitelKNN) > 300){
+    #   allTitelKNN <- totalInfo %>% 
+    #     filter(author %in% aA1_top10NeigbhorsCos) %>% 
+    #     filter(clicked == TRUE) %>% 
+    #     select(itemID, titleUndBeschreibung) %>% 
+    #     rename(doc_id = itemID, text = titleUndBeschreibung)
+    # } 
+    # macht das Sinn? Wenn das tibble jetzt kleiner wird, fliegen dann nicht die
+    # Items raus, die gekauft oder in den Warenkorb gelegt wurden, ohne angeklickt
+    # worden zu sein?
+    # bspw. item 61962 goldilocks --> clicked FALSE // basket FALSE // ordered TRUE
+    # bzgl. der Filterungen müsste man nochmal überlegen
+    
+    # Evtl. könnte man eine Variable einbauen wie "größtmögliches tibble"
+    # die nicht während der Routine überschrieben wird und stattdessen immer wieder
+    # auf das ausgangs-tibbel zurückgegriffen wird.
+    
+    # Neue Lösung: Mehrere OR-Statements. Wenn das Kriterium noch nicht erreicht
+    # ist, wird eine hierarchisch untergeorndete Stufe (click < basket < order)
+    # rausgeworfen. So wird sichergestellt, dass die tatsächlich gekauften Items
+    # nicht schon vorher rausfliegen
+    
+    if(nrow(allTitelKNN) > 300){
+      allTitelKNN <- totalInfo %>% 
+        filter(author %in% aA1_top10NeigbhorsCos) %>% 
+        filter(basket == TRUE | ordered == TRUE) %>%
+        select(itemID, titleUndBeschreibung) %>% 
+        rename(doc_id = itemID, text = titleUndBeschreibung)
+    } 
+    
+    if(nrow(allTitelKNN) > 300){
+      allTitelKNN <- totalInfo %>% 
+        filter(author %in% aA1_top10NeigbhorsCos) %>% 
+        filter(ordered == TRUE) %>% 
+        select(itemID, titleUndBeschreibung) %>% 
+        rename(doc_id = itemID, text = titleUndBeschreibung)
+    } 
+    
     # Jetzt müssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
     # zusammengeführt und die doc_id entsprechend vergeben werden
     
-    activeTitel1MitBeschreibung <- itemsUndBeschreibung %>% 
+    activeTitel1MitBeschreibung <- totalInfo %>% 
       filter(title == activeTitel1) %>% 
       select(itemID, titleUndBeschreibung) %>% 
       rename(doc_id = itemID, text = titleUndBeschreibung)
@@ -493,15 +590,16 @@ TM_Recommendations <- function(activeItem){
     top5Recc <- sort(CosineTitel[as.character(activeTitel1MitBeschreibung$doc_id),], decreasing = TRUE)
     #top5Recc <- sort(CosineTitel["45274",], decreasing = TRUE)
     top5Recc <- top5Recc[names(top5Recc) != as.character(activeTitel1MitBeschreibung$doc_id)]# [1:5]
+    topRecc <- top5Recc[top5Recc != 0]
     #top5Recc <- top5Recc[names(top5Recc) != "45274"][1:5]
     
-    print(paste("For Item", activeTitel1, "the top 5 Recommendations are:", sep = " "))
-    return(top5Recc)
+    print(paste("For Item", activeTitel1, "the top ○Recommendations are:", sep = " "))
+    return(topRecc)
     
   }
   
 }
 
 tic("Start function")  
-TM_Recommendations(1)
+TM_Recommendations(999)
 toc()
