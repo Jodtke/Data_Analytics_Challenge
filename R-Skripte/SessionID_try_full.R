@@ -28,7 +28,7 @@ trans <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_
   order = col_integer()
 ))
 ## joinen & Reihenfolge der Spalten verändern
-joined_item_trans <- left_join(items, trans, by="itemID")
+joined_item_trans <- left_join(trans, items, by="itemID")
 joined_item_trans <- joined_item_trans[, c(7,1,8:10,2:6) ]
 #head(joined_item_trans, n=10)
 transactions_raw <- read.csv(file = "./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F)
@@ -85,7 +85,7 @@ length(unique(dup.ses$itemID)) #für 14471 Bücher würde das funktionieren
 
 
 #Recommendation Function based on sessionID
-#für 1 Buch erstmal 
+ 
 Recommendation_function <- function(activeItem){
   this_ses <- dup.ses %>% group_by(sessionID) %>%   
     filter(itemID==activeItem) %>% select(sessionID)
@@ -97,12 +97,20 @@ Recommendation_function <- function(activeItem){
   potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItem)%>% 
     summarise(nClick=sum(click),nBasket=sum(basket),norder=sum(order)) %>%
     arrange(desc(nClick))
-  potential_recommendations <- top5$itemID
-  return(potential_recommendations)
+  alpha <- 0.2
+  beta <- 0.3
+  gamma <-0.5
+  potential_recommendations <- potential_recommendations %>% 
+    mutate(kennzahl = (nClick*alpha + nBasket*beta + norder*gamma)/sum(alpha,beta,gamma))
+  potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
+    filter(itemID != activeItem) %>% slice_max(kennzahl,n=10) #gibt mehr als 10 raus, wegen gleichen Werten 
+  list_of_poten_rec <- as.list(potential_recommendations) 
+  return(list_of_poten_rec)
 }
 
 #try
-Recommendation_function(41198)
+Recommendation_function(76465)
+###############################################################################
 
 #lassen die Funktion für ein Vektor der Bücher laufen
 # books <- c(5468,44827)
@@ -116,9 +124,10 @@ Recommendation_function(41198)
 ################################################################################
 ###09.06.2021#############Umformung der Funktion für eine Liste#################
 ######try for random sample of books from OR_tibble#####
-set.seed(345)
+set.seed(123)
 test_random <- sample_n(oR_tbl, 1)    #tibble 25 rows
-books <- as.list(test_random$itemID)   #
+#test_random <- oR_tbl %>% filter(itemID==76465)
+books <- as.list(test_random$itemID)   
 result <- list()
 for (i in 1:length(books)){
   book <- books[[i]]
@@ -153,8 +162,9 @@ result
 
 
 ###Funktion#####
-Function_no_tr_daten <- function(activeItem){
-  selected_features <- oR_tbl %>% filter(itemID==activeItem) %>%
+activeItem <- 48800
+Notausgang_function <- function(activeItem){
+  selected_features <- oR_tbl %>% filter(itemID==7892) %>%
     select(itemID,author,main.topic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
   if (nrow(selected_features) == 0){
     return(list())
@@ -163,24 +173,24 @@ Function_no_tr_daten <- function(activeItem){
   this_publisher <- selected_features$publisher
   this_genre <- selected_features$main.topic
   items_select <- oR_tbl %>% filter(author==this_author | publisher==this_publisher & main.topic==this_genre)#filter einsetzen
-  #nimm_5 <- sample_n(auth_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
-  items_select <- items_select$itemID              #extrahieren alle potential recommendations
-  return(items_select)
+  nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
+  nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random Bücher mit dem gleichen (Publisher oder author) und main.topic
+  return(nimm_5)
 }
-Function_no_tr_daten(12)    #aber egtl muss sie eine Liste ausspucken
+Notausgang_function(7892)    #aber egtl muss sie eine Liste ausspucken
 
 ####
 #über Liste laufen lassen und Lüchen ausfüllen, wo leere Liste damals war ##
 for (i in 1:length(result)){
   if (length(result[[i]]) < 1){
     book <- names(result)[i]
-    result[[i]] <- Function_no_tr_daten(book)
+    result[[i]] <- Notausgang_function(book)
   }
 }
 result
 ################################################################################
 #simulate recommendation for ActiveItem # 76465
-TM_Alg_Recommend <- result
+TM_Recommendations <- result
 
 ##result 2 is output from Simularity, die wir von Subtopics berechnet haben, hier hypotesisch
 activeItem <- 76465
@@ -198,9 +208,42 @@ result3
 Transact_Recommend <- result3
 
 #merge all potential recommendatons into one list #unter einem Name ist active item und unten alle potential recommend
-all_potential_recom <- Map(c, TM_Alg_Recommend, Subt_TM_Recommend,Transact_Recommend) 
+all_potential_recom <- Map(c, TM_Recommendations, Subt_TM_Recommend,Transact_Recommend) 
 
-#TM_Alg_Recommend output vergleich mit Subt_TM_Recommend output und Transact_Recommend output
+#TM_Recommendations output vergleich mit Subt_TM_Recommend output und Transact_Recommend output
 
 count_table <- as.data.frame(table(all_potential_recom))
-count_table %>% select(all_potential_recom, Freq) %>% arrange(Freq)
+count_table %>% select(all_potential_recom, Freq) %>% arrange(desc(Freq))
+
+
+################################################################################
+#für die Bedunung müssen die ganze Zeile von active Item extrahieren#
+activeItem <- 73018
+activeItem <- totalInfo %>% filter(itemID==activeItem)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
+
+proveSubtopics <- activeItem %>% select(uniteTopics) %>% is.na()
+proveKlappentext <- activeItem %>% select(Beschreibung) %>% is.na()
+
+##Struktur von finalen Funktion
+
+#Fall_1: Subtopic + Klappentext + inDupSes =alle sind True
+if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == TRUE){
+  print("fall_1")
+}
+
+#Fall_2: Subtopic + inDupSes .   kein Klappentext == NA 
+if(proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == TRUE){
+  print("Fall_2")
+}
+
+#Fall_3:Subtopic + Klappentext. Nicht in dup.ses.
+if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == FALSE){
+  print("fall_3")
+}
+#Fall_4: Nur Subtopic Simularity, kein KT, nicht in Dup.ses.   #Obwohl ich bin mir nicht sicher, ob dieser Fall kommt oder soll gleich NOTAUSGANGFUNKTION angeschaltet werden
+if (proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == FALSE){
+  print("fall_3")
+else {
+  Notausgang_function(activeItem)
+}
+  
