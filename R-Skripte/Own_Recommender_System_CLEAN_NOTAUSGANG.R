@@ -445,3 +445,70 @@ toc()
 tic("Start ST_Rec")
 UniteTopics_Recommendations(999)
 toc()
+################################################################################
+#Recommendation Function based on sessionID
+Recommendation_function_inDupSes <- function(activeItem,alpha,beta,gamma){
+  this_ses <- dup.ses %>% group_by(sessionID) %>%   
+    filter(itemID==activeItem) %>% select(sessionID)
+  if (nrow(this_ses) == 0){
+    return(list())
+  }
+  this_ses <- this_ses$sessionID
+  this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID) 
+  potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItem)%>% 
+    summarise(nClick=sum(click),nBasket=sum(basket),norder=sum(order)) %>%
+    arrange(desc(nClick))
+  potential_recommendations <- potential_recommendations %>% 
+    mutate(kennzahl = (nClick*alpha + nBasket*beta + norder*gamma)/sum(alpha,beta,gamma))
+  potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
+    filter(itemID != activeItem) %>% slice_max(kennzahl,n=10) #gibt mehr als 10 raus, wegen gleichen Werten 
+  list_of_poten_rec <- as.list(potential_recommendations$itemID) 
+  return(list_of_poten_rec)
+}
+### Test der Funktion
+Recommendation_function_inDupSes(76465,0.2,0.3,0.5)
+
+##Recommendation Function schlechter Fall
+Notausgang_funktion <- function(activeItem){
+  selected_features <- totalInfo %>% filter(itemID==activeItem) %>%
+    select(itemID,author,mainTopic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
+  if (nrow(selected_features) == 0){
+    return(list())
+  }
+  this_author <- selected_features$author         #als chr darstellen 
+  this_publisher <- selected_features$publisher
+  this_genre <- selected_features$mainTopic
+  items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
+  nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
+  nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random Bücher mit dem gleichen (Publisher oder author) und mainTopic
+  return(nimm_5)
+}
+### Test der Funktion
+Notausgang_funktion(999)
+
+##Struktur von finalen Funktion
+activeItem <- 999
+activeItem <- totalInfo %>% filter(itemID==activeItem)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
+proveSubtopics <- activeItem %>% select(uniteTopics) %>% is.na()
+proveKlappentext <- activeItem %>% select(Beschreibung) %>% is.na()
+
+#Fall_1: Subtopic + Klappentext + inDupSes =alle sind True
+if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == TRUE){
+  print("fall_1")
+}
+
+#Fall_2: Subtopic + inDupSes .   kein Klappentext == NA 
+if(proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == TRUE){
+  print("Fall_2")
+}
+
+#Fall_3:Subtopic + Klappentext. Nicht in dup.ses.
+if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == FALSE){
+  print("fall_3")
+}
+#Fall_4: Nur Subtopic Simularity, kein KT, nicht in Dup.ses.   #Obwohl ich bin mir nicht sicher, ob dieser Fall kommt oder soll gleich NOTAUSGANGFUNKTION angeschaltet werden
+if (proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == FALSE){
+  print("fall_4")
+  }else {
+    Notausgang_funktion(activeItem)
+  }

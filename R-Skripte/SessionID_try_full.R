@@ -86,7 +86,7 @@ length(unique(dup.ses$itemID)) #für 14471 Bücher würde das funktionieren
 
 #Recommendation Function based on sessionID
  
-Recommendation_function <- function(activeItem){
+Recommendation_function <- function(activeItem,alpha,beta,gamma){
   this_ses <- dup.ses %>% group_by(sessionID) %>%   
     filter(itemID==activeItem) %>% select(sessionID)
   if (nrow(this_ses) == 0){
@@ -97,9 +97,6 @@ Recommendation_function <- function(activeItem){
   potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItem)%>% 
     summarise(nClick=sum(click),nBasket=sum(basket),norder=sum(order)) %>%
     arrange(desc(nClick))
-  alpha <- 0.2
-  beta <- 0.3
-  gamma <-0.5
   potential_recommendations <- potential_recommendations %>% 
     mutate(kennzahl = (nClick*alpha + nBasket*beta + norder*gamma)/sum(alpha,beta,gamma))
   potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
@@ -109,7 +106,7 @@ Recommendation_function <- function(activeItem){
 }
 
 #try
-Recommendation_function(76465)
+Recommendation_function(76465,0.2,0.3,0.5)
 ###############################################################################
 
 #lassen die Funktion für ein Vektor der Bücher laufen
@@ -163,8 +160,8 @@ result
 
 ###Funktion#####
 activeItem <- 48800
-Notausgang_function <- function(activeItem){
-  selected_features <- oR_tbl %>% filter(itemID==7892) %>%
+Notausgang_funktion <- function(activeItem){
+  selected_features <- oR_tbl %>% filter(itemID==activeItem) %>%
     select(itemID,author,main.topic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
   if (nrow(selected_features) == 0){
     return(list())
@@ -177,14 +174,14 @@ Notausgang_function <- function(activeItem){
   nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random Bücher mit dem gleichen (Publisher oder author) und main.topic
   return(nimm_5)
 }
-Notausgang_function(7892)    #aber egtl muss sie eine Liste ausspucken
+Notausgang_funktion(7892)    #aber egtl muss sie eine Liste ausspucken
 
 ####
 #über Liste laufen lassen und Lüchen ausfüllen, wo leere Liste damals war ##
 for (i in 1:length(result)){
   if (length(result[[i]]) < 1){
     book <- names(result)[i]
-    result[[i]] <- Notausgang_function(book)
+    result[[i]] <- Notausgang_funktion(book)
   }
 }
 result
@@ -244,6 +241,6 @@ if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes 
 if (proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == FALSE){
   print("fall_3")
 else {
-  Notausgang_function(activeItem)
+  Notausgang_funktion(activeItem)
 }
   
