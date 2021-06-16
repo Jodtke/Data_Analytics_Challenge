@@ -1,17 +1,19 @@
-# Neuer Ansatz: Eigenes Recommender-System basierend auf den Vorschlägen vom 16.05.2021
-
-# Autoren-Similarity basierend auf den Main-Topics berechnen.
-# Ziel: Eine Matrix mit den Autoren in den Zeilen und den Main-Topics in den Spalten
-# In den Zellen stehen dann die Anzahl der Bücher des jeweiligen Autoren im jeweiligen Genre
-# Damit die Matrix nicht ausufert müssen wir vorher die Main-Topics "zusammenstampfen".
-# Grund: Somit können wir die Autoren gruppieren und bspw. die Roman-Autoren von Kochbuch-Autoren trennen.
-# Somit schränken wir auch sofort die Büchersuche auf diese Bereiche ein und sparen uns so Rechenzeit,
-# die verloren gehen würde, wenn wir in "sinnbefreiten" Genre suchen würden.
+# Hybrid recommender System
 
 # Working Directory Definieren
 
 getwd()
 setwd("C:/Users/Rolf/Desktop/WFI - Unterlagen/Master/4. Semester/Data Analytics Challenge/Data_Analytics_Challenge")
+
+# Packages installieren
+
+# install.packages("tidyverse")
+# install.packages("tictoc")
+# install.packages("parallelMap")
+# install.packages("parallel")
+# install.packages("proxyC")
+# install.packages("lsa")
+# install.packages("tm")
 
 # Packages laden
 
@@ -22,243 +24,249 @@ library(parallel)
 library(proxyC)
 library(tm)
 
-# Datensatz laden
+### DatensÃ¤tze laden
 
-# Da wir ja bereits festegestellt haben, dass diverse Autoren häufiger unter einem anderen Namen vorkommen,
-# verwenden wir die von Eric mittels Open Refine vorbehandelte Matrix. In dieser sind bestenfalls auch schon
-# die Main Topics auf die ersten zwei, drei Buchstaben zusammengestampft.
+# Datensatz mit Item-Informationen
+items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
 
-## Datenaufbereitung ############################################################
+# Datensatz mit Transaktionsdaten
+transactions <- as_tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
 
-#items3 <- read.csv("./Data/items3.csv")
+# Crawler-Daten mit Klappentexten
+FCD_tibble <- as_tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
 
-items5 <- read.csv("./Data/items5.csv", encoding = "UTF-8")
+# Evaluations-Daten
+evaluation <- read.csv("./Data/evaluation.csv")
 
-#items6 <- read.csv("./Data/items6.csv", encoding = "UTF-8")
+### DatensÃ¤tze transformieren und ergÃ¤nzende erstellen
 
-# Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Genre
-AuthMat <- items5 %>% 
-  group_by(author, main.topic) %>% 
-  dplyr::summarise(n = n()) %>% 
-  spread(key = main.topic, value = n)
+### Cosine Similarity Matrix erstellen (basierend auf Subtopics)
 
-# Autorennamen abspeichern, da diese später als rownames eingefügt werden
+# Erstelle Similarity-Matrix, welche die Cosine Similarity und somit die
+# Ãhnlichkeit zwischen den Autoren berechnet.
+# Dabei wird BerÃ¼cksichtigt, wie viele BÃ¼cher die Autoren im jeweiligen
+# Main Topic und Sub Topic geschrieben haben
+
+# Imporiteren der AuthMat_subtopics aus anderem Skript
+AuthMat <- read.csv("./Data/AuthMat_subtopics.csv", check.names = FALSE)
+
+# Autorennamen abspeichern, da diese spÃ¤ter als rownames eingefÃ¼gt werden
 Authors <- AuthMat$author
 
-apply(AuthMat,2,class)
-
-# komischerweise werden die Spalten als character dargestellt, deswegen müssen die Variablen
-# in numerische Werte transformiert werden, damit die Korrelationen zwischen den Autoren berechnet
-# werden können
-
+# Spalten in integer konvertieren
 AuthMat <- apply(AuthMat[2:ncol(AuthMat)],2,as.integer)
 
-# Überprüfung, ob Transformation funktioniert hat
-apply(AuthMat,2,class)
-head(AuthMat)
+# Die NA's durch Nullen ersetzen
+AuthMat[is.na(AuthMat)] <- 0
 
-# Nun befindet sich die Matrix in der gewünschten Formatierung:
-# In den Zeilen stehen die Autoren und in den Spalten die Main Topics
-# Dazu kommt, dass die Spalten nun auch alle numerisch sind, folglich können
-# darauf nun similarity-Algorithmen angewendet werden.
+# Die Matrix in Integer konvertieren um Speicherplatz zu sparen, ist aktuell numeric
+mode(AuthMat) <- "integer"
 
-# Grundsätzlich bieten sich hierfür folgende drei an:
-# 1. Pearson Correlation
-# 2. Jaccard Coefficient
-# 3. Cosine Similarity
-
-# Während für die Pearson Correlation schon eine Implementation in {stats}
-# vorhanden ist, benötigen wir für die anderen beiden ein extra package.
-# Hierfür wählen wir das Package "proxy" da wir mit diesem sowohl den Jaccard
-# Coefficient berechnen können, als auch die Cosine Similarity
-
-# Für kleine bis mittelgroße Matrizen
-# install.packages("proxy")
-# library(proxy)
-
-# Für große Matritzen
-# install.packages("proxyC")
-# library(proxyC)
-
-#AuthorCor <- cor(t(AuthMat), use = "pairwise.complete.obs", method = "pearson")
-
-# Leider hat die Funktion simil aus dem proxy-Package Probleme, wenn sich NAs
-# im Datensatz befinden. Foglich müssen wir diese alle zunächst in Nullen
-# konvertieren, damit as Ergebnis nicht verzerrt wird:
-
-AuthMat0 <- AuthMat
-AuthMat0[is.na(AuthMat0)] <- 0
-mode(AuthMat0) <- "integer"
-# dim(AuthMat0)
-# length(Authors)
+# Defintion der Zeilennamen mit den Namen der Autoren
 rownames(AuthMat) <- Authors
-rownames(AuthMat0) <- Authors
 
-AuthMat0sparse <- as(AuthMat0, "sparseMatrix")
+# Die Matrix in eine sparse Matrix konvertieren, um Speicherplatz zu sparen
+AuthMatSparse <- as(AuthMat, "sparseMatrix")
 
-## Anwendung von proxyC -#######################################################
-
-rm(Authors)
-rm(AuthMat)
-
-#AuthMat0sparse <- as(AuthMat0, "sparseMatrix")
-rm(AuthMat0)
-
-## Anwendung Cosine - akutelle Alternative, da schneller #######################
-
+# Basierend auf dieser sparse Matrix die Cosine Similarity zwischen den Autoren berechnen
 tic("Dauer Cosine mit proxyC und drop0 = TRUE")
 parallelStartSocket(cpus = detectCores())
 
-CosineSparse <- proxyC::simil(AuthMat0sparse, method = "cosine", drop0 = TRUE)
+CosineSparse <- proxyC::simil(AuthMatSparse, method = "cosine", drop0 = TRUE)
 
 parallelStop()
 toc()
 
-#Dauer: 25.83 Sekunden
-# Beim zweiten Mal hat es geringfügig länger gedauert, nämlich 28.63 Sekunden
-object.size(CosineSparse)
-# Größe: 648259360 byte = ca. 0.68 GB
-# Und auch beim zweiten Mal ist das Objekt exakt genauso groß
+# Nicht mehr benötigte Datensätze löschen, um Speicherplatz zu sparen
+rm(Authors, AuthMat, AuthMatSparse)
 
-### ENDE Phase 1 ###############################################################
+### Erstellung Item-Matrix, welche Ausprägung in entsprechendem Subtopic enthält
 
-### BEGINN Phase 2 #############################################################
+# Imporiteren der itemMat_subtopics aus anderem Skript
+itemMat <- read.csv("./Data/itemMat_subtopics.csv", check.names = FALSE)
 
-# Somit ist Phase 1 - die Ermittlung der Ähnlichkeite der Autoren basierend auf 
-# den Main Topics - abgeschlossen.
-# Im nächsten Schritt müssen wir uns die Zielautoren ausgeben lassen,
-# anschließend können wir in der Matrix nach besagtem Autor suchen und uns
-# dessen kNearestNeighbors sowie deren geschriebene Bücher ausgeben lassen.
+# ItemID's abspeichern, da diese später als rownames eingefügt werden
+itemIDs <- as.character(itemMat$itemID)
 
-# Import von Items
-items5 <- read.csv("./Data/items5.csv", encoding = "UTF-8")
+# Spalten in integer konvertieren
+itemMat <- apply(X=itemMat[, 2:ncol(itemMat)], MARGIN=2, FUN=as.integer)
 
-items5[duplicated(items5$title),] %>% nrow()
-# haben 6474 Titel die gleich hei?en - m?ssen wir rausschmei?en
+# Die NA's durch Nullen ersetzen
+itemMat[is.na(itemMat)] <- 0
 
-# Die Subtopics, die nur [] sind, sollen durch NAs ersetzt werden
-#subtopics <- ifelse(items5$subtopics == "[]", NA, items5$subtopics)
-#items5$subtopics <- subtopics
-#sum(is.na(subtopics))
-# 33643 Items haben keine Subtopics
+# Die Matrix in Integer konvertieren um Speicherplatz zu sparen, ist aktuell numeric
+mode(itemMat) <- "integer"
 
-# Remove duplicates
-#items5 <- items5 %>% distinct(title, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
-#items5titleSubTop <- items5 %>% distinct(title, subtopics, .keep_all = TRUE) # schmei?t nur die mit gleichem titel und gleiche Subtopics raus
+# Defintion der Zeilennamen mit den ItemID's
+rownames(itemMat) <- itemIDs
 
-# DARF MAN SO NICHT MACHEN!!! Sonst fliegen auch ItemIDs raus, die in Evaluation sind. Man kann dann nicht mehr joinen -.-'
+# Die Matrix in eine sparse Matrix konvertieren, um Speicherplatz zu sparen
+itemMatSparse <- as(itemMat, "sparseMatrix")
 
-## Import der Transactions-Daten
-transactions <- as.tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
+# Nicht mehr benötigte Datensätze löschen, um Speicherplatz zu sparen
+rm(itemIDs, itemMat)
 
-# Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
-# die ausgibt, ob ein Item in Transactions vorkommt
+### joined_oR erstellen
 
-joined_oR <- left_join(transactions, items5, by = "itemID")
+# ZusammenfÃ¼gen der Transaktions- und Item-Daten, welche als Ausgangspunkt
+# zur Gewinnung weiterer Features dienen
+joined_oR <- left_join(transactions, items7, by = "itemID")
 
-itemsInTrans <- joined_oR %>% select(itemID) %>% unique() %>% mutate(inTransactions = TRUE)
-itemsWithTrans <- items5 %>% left_join(itemsInTrans, by = "itemID")
-itemsWithTrans$inTransactions[is.na(itemsWithTrans$inTransactions)] <- FALSE
-
-#sum(itemsWithTrans$inTransactions)
-# sind 24909 Items
-
-# Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
-# die ausgibt, ob ein Item in dup.ses vorkommt
-
+# Erstellung von dup.ses, um im spÃ¤teren Verlauf eine Art ARM anwenden zu kÃ¶nnen
 dup.ses <- joined_oR[joined_oR$sessionID %in%
                        joined_oR$sessionID[duplicated(joined_oR$sessionID)],]
 
-itemsInDupSes <- dup.ses %>% select(itemID) %>% unique() %>% mutate(inDupSes = TRUE)
-itemsWithDupSes <- itemsWithTrans %>% left_join(itemsInDupSes, by = "itemID")
-itemsWithDupSes$inDupSes[is.na(itemsWithDupSes$inDupSes)] <- FALSE
+# Erstellung der Variable inDupSes, welche darÃ¼ber informiert, ob sich ein Item
+# in Dup.Ses befindet oder nicht
+inDupSes <- dup.ses %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(inDupSes = TRUE)
 
-sum(itemsWithDupSes$inDupSes)
-# sind 14471
+# Erstellung der Variable inTransactions, welche darÃ¼ber informiert, ob sich ein 
+# Item transactions befindet oder nicht 
+itemsInTrans <- joined_oR %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(inTransactions = TRUE)
 
-# Import der Crawler-Daten
-FCD <- readRDS("./Data/FinaleCrawlerDatenUpdated.rds")
+# Erstellung der Variable clicked, welche darÃ¼ber informiert, ob ein Item 
+# mindestens einmal angeklickt wurde oder nicht 
+clicked <- joined_oR %>% 
+  filter(click > 0) %>%
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(clicked = TRUE)
 
-# https://stackoverflow.com/questions/49564748/extract-multiple-elements-from-a-list-of-lists-lapply
-FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15))))
+# Erstellung der Variable basket, welche darÃ¼ber informiert, ob ein Item 
+# mindestens einmal in den Warenkorb gelegt wurde oder nicht
+basket <- joined_oR %>%
+  filter(basket > 0) %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(basket = TRUE)
 
-sum(is.na(FCD_tibble$Beschreibung))
-# 13732 Items haben keine Klappentexte
+# Erstellung der Variable ordered, welche darÃ¼ber informiert, ob ein Item 
+# mindestens einmal gekauft wurde oder nicht
+ordered <- joined_oR %>%
+  filter(order > 0) %>% 
+  select(itemID) %>% 
+  unique() %>% 
+  mutate(ordered = TRUE)
 
-FCD_tibble <- FCD_tibble %>% 
-  rename(title = Titel) %>% 
-  mutate(title = unlist(title)) %>% 
-  mutate(Beschreibung = unlist(Beschreibung)) #%>% 
-#mutate(title = toupper(title)) %>% 
-#mutate(Beschreibung = toupper(Beschreibung))
+### Reduzierung der Crawler-Daten
 
-# Auch hier m?ssen wir noch die duplicates raushauen
-FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
+# Da diverse BÃ¼cher mit dem identischen Titel vorliegen, die Item-Daten mit den
+# Crawler-Daten jedoch Ã¼ber die Titel gejoint werden, mÃ¼ssen zunÃ¤chst alle
+# Duplikate basierend auf den Titeln aussoritert werden.
+FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
+# ACHTUNG: Hier besteht immer noch Verbesserungspotential!
+# Aktuell wird ja einfach nur das erste Item beibehalten, alle nachfolgenden
+# werden aussortiert. Dabei kann es ja aber durchaus passieren, dass das erste
+# Item keinen Klappentext hatte, die Duplikate jedoch schon. So gehen die
+# Klappentexte verloren!
 
-# Hinzuf?gen der Beschreibung zu items
+### Erstellung des tibbles totalInfo
 
-totalInfo <- itemsWithDupSes %>% 
-  left_join(FCD_tibble, by = "title")
+# Erstelle tibble totalInfo, welches folgende Informationen enthÃ¤lt:
+# - itemID
+# - titel
+# - autor
+# - publisher
+# - main topic
+# - unite topic (main topic + sub topics)
+# - inTransactions (TRUE/FALSE)
+# - clicked (TRUE/FALSE)
+# - basket (TRUE/FALSE)
+# - ordered (TRUE/FALSE)
+# - inDupSes (TRUE/FALSE)
+# - Beschreibung
+# - titleUndBeschreibung (titel + Beschreibung)
 
-totalInfo$subtopics <- gsub("\\[|\\]", "", totalInfo$subtopics)
-totalInfo$subtopics <- gsub(","," ", totalInfo$subtopics)
+# VerknÃ¼pfung items7 mit itemsInTrans Ã¼ber die itemID
+totalInfo <- items7 %>% left_join(itemsInTrans, by = "itemID")
+# Ãberschreibung der NA mit FALSE
+totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
 
-totalInfo <- totalInfo %>% 
-  mutate(MainAndSub = paste(main.topic, subtopics, sep = " ")) # ACHTUNG: Hier kanne es noch zu überschneidungen kommen!
+# VerknÃ¼pfung von totalInfo mit clicked Ã¼ber die itemID
+totalInfo <- totalInfo %>% left_join(clicked, by = "itemID")
+# Ãberschreibung der NA mit FALSE
+totalInfo$clicked[is.na(totalInfo$clicked)] <- FALSE
 
-#SubTopAndBeschr <- itemsUndBeschreibung %>% 
-#  filter(!is.na(subtopics) & !is.na(Beschreibung) )
-# hier erscheinen pl?tzlich viel mehr Items
-# das liegt daran, dass manche B?cher mehrmals vorkommen, allerdings teilweise
-# andere Klappentexte (oder Erscheinungsformen) haben
+# VerknÃ¼pfung von totalInfo mit basket Ã¼ber die itemID
+totalInfo <- totalInfo %>% left_join(basket, by = "itemID")
+# Ãberschreibung der NA mit FALSE
+totalInfo$basket[is.na(totalInfo$basket)] <- FALSE
 
-# Neue Spalte erstellen, welche Title und Klappentext verkn?pft.
-# So kann man immerhin ?ber die Titel die Similarity bestimmen, wenn kein
-# Klappentext verf?gbar ist
+# VerknÃ¼pfung von totalInfo mit ordered Ã¼ber die itemID
+totalInfo <- totalInfo %>% left_join(ordered, by = "itemID")
+# Ãberschreibung der NA mit FALSE
+totalInfo$ordered[is.na(totalInfo$ordered)] <- FALSE
 
-itemsUndBeschreibung <- totalInfo %>% 
-  mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " ")) %>% 
-  select(itemID, author, inTransactions, inDupSes, title, titleUndBeschreibung)
+# VerknÃ¼pfung von totalInfo mit inDupSes Ã¼ber die itemID
+totalInfo <- totalInfo %>% left_join(inDupSes, by = "itemID")
+# Ãberschreibung der NA mit FALSE
+totalInfo$inDupSes[is.na(totalInfo$inDupSes)] <- FALSE
 
-#rm(items5)
+# VerknÃ¼pfung von totalInfo mit der Beschreibung (Klappentext) Ã¼ber den Titel
+totalInfo <- totalInfo %>% left_join(FCD_tibble, by = "title")
 
-# Laden des Evaluationsdatensatz
-evaluation <- read.csv("./Data/evaluation.csv")
+# Erzeugung der Variable titelUndBeschreibung, um Text Mining zu verbessern
+totalInfo <- totalInfo %>% mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
 
-activeAuthorAndTitel <- evaluation %>% 
-  left_join(itemsUndBeschreibung, by = "itemID")
+# Nicht mehr benötigte Datensätze löschen, um Speicherplatz zu sparen
+rm(clicked, basket, ordered, inDupSes, itemsInTrans, items7, transactions, joined_oR, FCD_tibble)
 
-# test <- evaluation %>% 
-#   left_join(items5, by = "itemID") %>% 
-#   select(itemID, author, title)
-# 
-# SimIsOne <- rep(NA,nrow(test))  
-# for(idx in 1:nrow(test)){
-#   activeAuthor1 <- test$author[idx] # hier loopen
-#   aA1_NeighorsCos <- CosineSparse[activeAuthor1,]
-#   #aA1_top10NeigbhorsCos <- sort(aA1_NeighorsCos, decreasing = TRUE)[1:10] # Namen der Autoren und deren Similarities
-#   #aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos) # nur noch deren Namen
-#   SimIsOne[idx] <- length(aA1_NeighorsCos[aA1_NeighorsCos == 1])
-# }  
-# 
-# # Hat ca. 3h gedauert -.-'
-# 
-# SimIsOne 
-# 
-# names(SimIsOne) <- test$author
-# SimIsOne
-# 
-# hist(SimIsOne)
-# 
-# aA1 <- activeAuthorAndTitel$author[293]  
-# aA1_N <- CosineSparse[aA1,]  
-# length(aA1_N[aA1_N == 1]) 
+### Erstellung von activeAuthorAndTitel
 
-## EINBETTUNG IN FUNKTION ######################################################
+# VerknÃ¼pfung des Evaulation-Tibbles mit totalInfo um sÃ¤mtliche Informationen
+# Ã¼ber die Ziel-Items zu erhalten
 
-TM_Recommendations <- function(activeItem){
+activeAuthorAndTitel <- evaluation %>% left_join(totalInfo, by = "itemID")
+
+# Nicht mehr benötigte Datensätze löschen, um Speicherplatz zu sparen
+rm(evaluation)
+
+### Defintion von Funktionen
+
+### Definition der Funktion 'makeDTM'
+
+# Da im weiteren Verlauf Fallunterscheidungen (if-Statements) auftreten, 
+# mÃ¼sste der Code mehrmals kopiert und eingefÃ¼gt werden.Durch die Definition 
+# einer Funktion sparen wir uns dieses Vorgehen, reduzieren dabei sogar noch 
+# Code-Redundanz und minimiern Gefahrenquellen durch manuelle Eingabe
+
+makeDTM <- function(x) {
   
-  ## Cosine-KNN für TM #########################################################
+  Corpus <- VCorpus(DataframeSource(x))
+  
+  Corpus <- Corpus %>%
+    tm_map(stripWhitespace) %>%
+    tm_map(removeNumbers) %>% # ist das sinnvoll?
+    tm_map(removePunctuation) %>%
+    tm_map(content_transformer(tolower)) %>%
+    tm_map(removeWords, stopwords("english")) %>% 
+    tm_map(removeWords, stopwords("german")) %>%
+    tm_map(removeWords, stopwords("french")) %>%
+    tm_map(removeWords, stopwords("spanish")) %>% 
+    tm_map(removeWords, c("NA","â¢","Â»","Â®", "â", "Â¡", "Â¿", "â"))
+  
+  # Als nÃ¤chstes wird der Corpus in eine TF-IDF-Matrix Ã¼berfÃ¼hrt:
+  DTM <- DocumentTermMatrix(Corpus, control = list(weighting = weightTfIdf))
+  
+  return(DTM)
+  
+}
+
+### Definition der Funktion 'makeAllTitles'
+
+# Da sowohl für die Klappentext-Similarity als auch für die Subtopic-Similarity
+# ähnliche Vorselektionen vorgenommen werden, bietet es sich an, eine Funktion
+# zu schreiben, die diese übernimmt, um Code-Redundanzen zu vermeiden
+
+makeAllTitles <- function(activeItem){
+  
+  ## Cosine-KNN fÃ¼r TM #########################################################
   
   activeAuthor1 <- activeAuthorAndTitel$author[activeItem] # hier loopen
   activeAuthor1
@@ -273,235 +281,234 @@ TM_Recommendations <- function(activeItem){
     aA1_top10NeigbhorsCos <- sort(aA1_NeighorsCos, decreasing = TRUE)[1:100]
     
     aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos) # nur noch deren Namen
-    #length(aA1_NeighorsCos[aA1_NeighorsCos == 1])
-    #hist(aA1_NeighorsCos, main = "aA1_NeighorsCos")
-    #summary(aA1_NeighorsCos)
-    # hier ist es das gleiche Problem, es gibt zu viele Autoren mit einer Similarity
-    # von 1 - genauer gesagt 3674.
     
-    # Test: Autoren mit Similarity != 1
-    #aA1_top10NeigbhorsCos <- sort(aA1_NeighorsCos[aA1_NeighorsCos != 1], decreasing = TRUE)[1:10]
-    #aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos)
-    # Ist eigentlich nicht mal so schlecht!
-    
-    # Die Anzahlen von Autoren, welche eine Similarity von 1 aufweisen, ist identisch
-    # zwischen Jaccard und Cosine. Gibt es dann überhaupt Unterschiede oder ist auch
-    # der Rest der Vektoren identisch?
-    # identical(aA1_NeighorsJacc, aA1_NeighorsCos)
-    # all.equal(aA1_NeighorsJacc, aA1_NeighorsCos)
-    # Das ist offenbar nicht der Fall, es liegen Unterschiede vor
-    
-    ## Text Mining #################################################################
-    
-    # Angenommen wir hätten jetzt die 10 ähnlichsten Autoren + den Autoren selbst, 
-    # dann müssen im Folgenden all ihre Bücher bzw. deren Titel extrahieren.
-    # Im Anschluss daran betten wir den Titel des aktiven Buchs mit all denn anderen
-    # Buchtiteln in eine TF-IDF-Matrix ein und berechnen dann für dieses Buch
-    # die 5 nächsten Nachbarn, basierend auf der Cosine Similarity.
-    
-    # # Zunächst: Extrahieren des Zielbuchtitels und des Klappentextes:
-    # activeTitel1 <- activeAuthorAndTitel$title[activeItem] # hier loopen
-    # activeTitel1
-    
-    # Bevor man diese diese nun für Text Mining verwenden kann, muss man eine doc_id
-    # in Spalte 1 hinzufgen und die Spalte 2 in 'text' umbenennen
-    
-    # Extrahieren aller Buchtitel des Ziel-Autors, außer des Ziel-Titels
-    allTitelActAuth1 <- itemsUndBeschreibung %>% 
-      filter(author == activeAuthor1 & title != activeTitel1) %>% 
-      select(itemID, titleUndBeschreibung) %>% 
-      rename(doc_id = itemID, text = titleUndBeschreibung)
+    # Extrahiere alle weiteren Buchtitel des Ziel-Autoren 
+    allTitelActAuth1 <- totalInfo %>% 
+      filter(author == activeAuthor1 & title != activeTitel1)
     
     # Extrahieren aller Buchtitel der kNN
-    allTitelKNN <- itemsUndBeschreibung %>% 
-      filter(str_detect(.$author, paste(aA1_top10NeigbhorsCos, collapse = "|"))) %>%
-      select(itemID, titleUndBeschreibung) %>% 
-      rename(doc_id = itemID, text = titleUndBeschreibung)
+    allTitelKNN <- totalInfo %>% 
+      filter(author %in% aA1_top10NeigbhorsCos)
     
-    # Jetzt müssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
-    # zusammengeführt und die doc_id entsprechend vergeben werden
+    # Jetzt mÃ¼ssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
+    # zusammengefÃ¼hrt und die doc_id entsprechend vergeben werden
     
-    activeTitel1MitBeschreibung <- itemsUndBeschreibung %>% 
-      filter(title == activeTitel1) %>% 
-      select(itemID, titleUndBeschreibung) %>% 
-      rename(doc_id = itemID, text = titleUndBeschreibung)
+    activeTitel1MitBeschreibung <- totalInfo %>% 
+      filter(title == activeTitel1) 
     
     allTitles <- rbind(activeTitel1MitBeschreibung, allTitelActAuth1, allTitelKNN)
     
-    # Hier auch nochmal die duplicates rausschmeißen
-    allTitles <- allTitles %>% distinct(doc_id, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
+    # Hier auch nochmal die duplicates rausschmeiÃen
+    allTitles <- allTitles %>% distinct(itemID, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
     
-    #allTitles
-    
-    Corpus <- VCorpus(DataframeSource(allTitles))
-    #Corpus
-    
-    # Empfohlenes Pre-Processing aus 'Modern Data Science with R'
-    Corpus <- Corpus %>%
-      tm_map(stripWhitespace) %>%
-      tm_map(removeNumbers) %>%
-      tm_map(removePunctuation) %>%
-      tm_map(content_transformer(tolower)) %>%
-      tm_map(removeWords, stopwords("english")) %>% 
-      tm_map(removeWords, stopwords("german"))
-    # Kann nicht einfach noch deutsche Stopwords entfernen, da dann englische Wörter wie 'Die'
-    # ebenfalls gelöscht werden würden :-/
-    
-    #strwrap(as.character(Corpus[[10]]))
-    # Eigentlich müsste man dan den Items-Datensatz in Sub-Datensätze nach Sprache
-    # aufteilen, um effektiv Stopwords entfernen zu können.
-    # Oder man pickt aus den 3500 Neighbors nur die mit der gleichen Sprache raus
-    
-    ## Visualisierung als Wourdcloud
-    
-    # library(wordcloud)
-    # wordcloud(Corpus, max.words = 30, scale = c(8, 1),
-    #           colors = topo.colors(n = 30), random.color = TRUE)
-    # War nicht wirklich aussagekräftig ;-)
-    
-    # Als nächstes wird der Corpus in eine TF-IDF-Matrix überführt:
-    DTM <- DocumentTermMatrix(Corpus, control = list(weighting = weightTfIdf))
-    #inspect(DTM)
-    
-    # Da man eine DTM nicht in eine sparseMatrix transformieren kann - das jedoch
-    # ein zentrales Kriterium für proxyC ist - müssen wir die cosine-Function aus
-    # einem anderen Paket benutzen
-    
-    tic("Dauer Cosine Similarity der Titel")
-    parallelStartSocket(cpus = detectCores())
-    
-    CosineTitel <- lsa::cosine(t(as.matrix(DTM)))
-    
-    parallelStop()
-    toc()
-    
-    # Ginge auch mit dem "herkömmlichen" proxy-Package, allerdings wird dort nur ein
-    # Dreieck erzeugt, während bei lsa sofort die ganze Matrix samt Hauptdiagonale
-    # erzeugt wird: proxy::simil(as.matrix(DTM), method = "cosine", upper = TRUE)
-    
-    # In einem letzten Schritt lassen wir uns nun noch die 5 nächsten Nachbarn,
-    # basierend auf der Ähnlichkeit der Buchtitel ausgeben
-    
-    top5Recc <- sort(CosineTitel[as.character(activeTitel1MitBeschreibung$doc_id),], decreasing = TRUE)
-    #top5Recc <- sort(CosineTitel["45274",], decreasing = TRUE)
-    top5Recc <- top5Recc[names(top5Recc) != as.character(activeTitel1MitBeschreibung$doc_id)]#[1:5]
-    #top5Recc <- top5Recc[names(top5Recc) != "45274"][1:5]
-    
-    print(paste("For Item", activeTitel1, "the top 5 Recommendations are:", sep = " "))
-    return(top5Recc)
+    return(allTitles)
     
   } else {
     
-    
-    #DupSesactiveAuthorAndTitel <- activeAuthorAndTitel %>% filter(inDupSes == TRUE)
-    #DupSesitemsUndBeschreibung <- itemsUndBeschreibung %>% filter(inDupSes == TRUE)
-    
-    aA1_top10NeigbhorsCos <- sort(aA1_NeighorsCos, decreasing = TRUE)#[1:100]
+    aA1_top10NeigbhorsCos <-  aA1_NeighorsCos[aA1_NeighorsCos == 1] 
+    # fraglich, ob man hier nicht vielleicht ">= 0.9" nimmt, anstatt "== 1"
     
     aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos) # nur noch deren Namen
     
-    # Angenommen wir hätten jetzt die 10 ähnlichsten Autoren + den Autoren selbst, 
-    # dann müssen im Folgenden all ihre Bücher bzw. deren Titel extrahieren.
-    # Im Anschluss daran betten wir den Titel des aktiven Buchs mit all denn anderen
-    # Buchtiteln in eine TF-IDF-Matrix ein und berechnen dann für dieses Buch
-    # die 5 nächsten Nachbarn, basierend auf der Cosine Similarity.
-    
-    # # Zunächst: Extrahieren des Zielbuchtitels und des Klappentextes:
-    # activeTitel1 <- activeAuthorAndTitel$title[1] # hier loopen
-    # activeTitel1
-    
-    # Bevor man diese diese nun für Text Mining verwenden kann, muss man eine doc_id
+    # Bevor man diese diese nun fÃ¼r Text Mining verwenden kann, muss man eine doc_id
     # in Spalte 1 hinzufgen und die Spalte 2 in 'text' umbenennen
     
-    # Extrahieren aller Buchtitel des Ziel-Autors, außer des Ziel-Titels
-    allTitelActAuth1 <- itemsUndBeschreibung %>% 
-      filter(author == activeAuthor1 & title != activeTitel1) %>% 
-      select(itemID, titleUndBeschreibung) %>% 
-      rename(doc_id = itemID, text = titleUndBeschreibung)
+    # Extrahiere alle weiteren Buchtitel des Ziel-Autoren 
+    allTitelActAuth1 <- totalInfo %>% 
+      filter(author == activeAuthor1 & title != activeTitel1) 
     
     # Extrahieren aller Buchtitel der kNN
-    allTitelKNN <- itemsUndBeschreibung %>% 
-      filter(str_detect(.$author, paste(aA1_top10NeigbhorsCos, collapse = "|"))) %>%
-      filter(inTransactions == TRUE) %>% 
-      select(itemID, titleUndBeschreibung) %>% 
-      rename(doc_id = itemID, text = titleUndBeschreibung)
-
-    # Jetzt müssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
-    # zusammengeführt und die doc_id entsprechend vergeben werden
+    allTitelKNN <- totalInfo %>% 
+      filter(author %in% aA1_top10NeigbhorsCos) 
     
-    activeTitel1MitBeschreibung <- itemsUndBeschreibung %>% 
-      filter(title == activeTitel1) %>% 
-      select(itemID, titleUndBeschreibung) %>% 
-      rename(doc_id = itemID, text = titleUndBeschreibung)
+    # length(unique(allTitelKNN$text)) nochmal in Ruhe anschauen
+    
+    if(nrow(allTitelKNN) > 300){
+      allTitelKNN <- totalInfo %>% 
+        filter(author %in% aA1_top10NeigbhorsCos) %>% 
+        filter(clicked == TRUE | basket == TRUE | ordered == TRUE)
+    } 
+    
+    if(nrow(allTitelKNN) > 300){
+      allTitelKNN <- totalInfo %>% 
+        filter(author %in% aA1_top10NeigbhorsCos) %>% 
+        filter(basket == TRUE | ordered == TRUE) 
+    } 
+    
+    if(nrow(allTitelKNN) > 300){
+      allTitelKNN <- totalInfo %>% 
+        filter(author %in% aA1_top10NeigbhorsCos) %>% 
+        filter(ordered == TRUE) 
+    } 
+    
+    # Jetzt mÃ¼ssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
+    # zusammengefÃ¼hrt und die doc_id entsprechend vergeben werden
+    
+    activeTitel1MitBeschreibung <- totalInfo %>% 
+      filter(title == activeTitel1)
     
     allTitles <- rbind(activeTitel1MitBeschreibung, allTitelActAuth1, allTitelKNN)
     
-    # Hier auch nochmal die duplicates rausschmeißen
-    allTitles <- allTitles %>% distinct(doc_id, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
+    # Hier auch nochmal die duplicates rausschmeiÃen
+    allTitles <- allTitles %>% distinct(itemID, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
     
-    #allTitles
-    
-    Corpus <- VCorpus(DataframeSource(allTitles))
-    #Corpus
-    
-    # Empfohlenes Pre-Processing aus 'Modern Data Science with R'
-    Corpus <- Corpus %>%
-      tm_map(stripWhitespace) %>%
-      tm_map(removeNumbers) %>%
-      tm_map(removePunctuation) %>%
-      tm_map(content_transformer(tolower)) %>%
-      tm_map(removeWords, stopwords("english")) %>% 
-      tm_map(removeWords, stopwords("german"))
-    # Kann nicht einfach noch deutsche Stopwords entfernen, da dann englische Wörter wie 'Die'
-    # ebenfalls gelöscht werden würden :-/
-    
-    strwrap(as.character(Corpus[[10]]))
-    # Eigentlich müsste man dan den Items-Datensatz in Sub-Datensätze nach Sprache
-    # aufteilen, um effektiv Stopwords entfernen zu können.
-    # Oder man pickt aus den 3500 Neighbors nur die mit der gleichen Sprache raus
-    
-    ## Visualisierung als Wourdcloud
-    
-    # library(wordcloud)
-    # wordcloud(Corpus, max.words = 30, scale = c(8, 1),
-    #           colors = topo.colors(n = 30), random.color = TRUE)
-    # War nicht wirklich aussagekräftig ;-)
-    
-    # Als nächstes wird der Corpus in eine TF-IDF-Matrix überführt:
-    DTM <- DocumentTermMatrix(Corpus, control = list(weighting = weightTfIdf))
-    #inspect(DTM)
-    
-    # Da man eine DTM nicht in eine sparseMatrix transformieren kann - das jedoch
-    # ein zentrales Kriterium für proxyC ist - müssen wir die cosine-Function aus
-    # einem anderen Paket benutzen
-    
-    tic("Dauer Cosine Similarity der Titel")
-    parallelStartSocket(cpus = detectCores())
-    
-    CosineTitel <- lsa::cosine(t(as.matrix(DTM)))
-    
-    parallelStop()
-    toc()
-    
-    # Ginge auch mit dem "herkömmlichen" proxy-Package, allerdings wird dort nur ein
-    # Dreieck erzeugt, während bei lsa sofort die ganze Matrix samt Hauptdiagonale
-    # erzeugt wird: proxy::simil(as.matrix(DTM), method = "cosine", upper = TRUE)
-    
-    # In einem letzten Schritt lassen wir uns nun noch die 5 nächsten Nachbarn,
-    # basierend auf der Ähnlichkeit der Buchtitel ausgeben
-    
-    top5Recc <- sort(CosineTitel[as.character(activeTitel1MitBeschreibung$doc_id),], decreasing = TRUE)
-    #top5Recc <- sort(CosineTitel["45274",], decreasing = TRUE)
-    top5Recc <- top5Recc[names(top5Recc) != as.character(activeTitel1MitBeschreibung$doc_id)]# [1:5]
-    #top5Recc <- top5Recc[names(top5Recc) != "45274"][1:5]
-    
-    print(paste("For Item", activeTitel1, "the top 5 Recommendations are:", sep = " "))
-    return(top5Recc)
+    return(allTitles)
     
   }
   
 }
 
-tic("Start function")  
-TM_Recommendations(1)
+
+### Definition von TM_Recommendations
+
+# Nachfolgend soll eien Funktion definiert werden, welche basierend auf
+# Titel-Und-Klappentext-Similarity einen Vektor mit itemID's ausgibt,
+# um so Buch/Item-Empfehlungen aussprechen zu kÃ¶nnen. Diese werden dann im
+# weiteren Verlauf den anderen Komponenten dieses hybriden Systems gegenÃ¼ber
+# gestellt.
+
+
+TM_Recommendations <- function(activeItem){
+  
+  allTitles <- makeAllTitles(activeItem)
+  
+  allTitles <- allTitles %>% 
+    select(itemID, titleUndBeschreibung) %>% 
+    rename(doc_id = itemID, text = titleUndBeschreibung)
+  
+  DTM <- makeDTM(allTitles)
+  
+  # Da man eine DTM nicht in eine sparseMatrix transformieren kann - das jedoch
+  # ein zentrales Kriterium fÃ¼r proxyC ist - mÃ¼ssen wir die cosine-Function aus
+  # einem anderen Paket benutzen
+  
+  tic("Dauer Cosine Similarity der Titel")
+  parallelStartSocket(cpus = detectCores())
+  
+  CosineTitel <- lsa::cosine(t(as.matrix(DTM)))
+  
+  parallelStop()
+  toc()
+  
+  # In einem letzten Schritt lassen wir uns nun noch die 5 nÃ¤chsten Nachbarn,
+  # basierend auf der Ãhnlichkeit der Buchtitel ausgeben
+  
+  top5Recc <- sort(CosineTitel[as.character(allTitles[1, ]$doc_id),], decreasing = TRUE)
+  top5Recc <- top5Recc[names(top5Recc) != as.character(allTitles[1, ]$doc_id)]#[1:5]
+  topRecc <- top5Recc[top5Recc != 0]
+  # hier kann man Ã¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
+  # wie >= 0.05 um Zufallstreffer rauszufiltern
+  
+  #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
+  return(topRecc)
+  
+}
+
+### Definition von UniteTops_Recommendations
+
+UniteTopics_Recommendations <- function(activeItem) {
+  
+  allTitles <- makeAllTitles(activeItem)
+  
+  itemIDs <- as.character(allTitles$itemID)
+  
+  itemMatKNN <- itemMatSparse[itemIDs,]
+  
+  tic("Dauer Cosine mit proxyC und drop0 = TRUE")
+  parallelStartSocket(cpus = detectCores())
+  
+  kNNCosine <- proxyC::simil(itemMatKNN, method = "cosine", drop0 = TRUE)
+  
+  parallelStop()
+  toc()
+  
+  # In einem letzten Schritt lassen wir uns nun noch die 5 nÃ¤chsten Nachbarn,
+  # basierend auf der Ãhnlichkeit der Buchtitel ausgeben
+  
+  top5Recc <- sort(kNNCosine[as.character(allTitles[1, ]$itemID),], decreasing = TRUE)
+  top5Recc <- top5Recc[names(top5Recc) != as.character(allTitles[1, ]$itemID)]#[1:5]
+  topRecc <- top5Recc[top5Recc != 0]
+  # hier kann man Ã¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
+  # wie >= 0.05 um Zufallstreffer rauszufiltern
+  
+  #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
+  return(topRecc)
+  
+}
+
+### Test der Funktionen
+
+tic("Start TM_Rec")  
+TM_Recommendations(999)
 toc()
+
+tic("Start ST_Rec")
+UniteTopics_Recommendations(999)
+toc()
+################################################################################
+#Recommendation Function based on sessionID
+Recommendation_function_inDupSes <- function(activeItem,alpha,beta,gamma){
+  this_ses <- dup.ses %>% group_by(sessionID) %>%   
+    filter(itemID==activeItem) %>% select(sessionID)
+  if (nrow(this_ses) == 0){
+    return(list())
+  }
+  this_ses <- this_ses$sessionID
+  this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID) 
+  potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItem)%>% 
+    summarise(nClick=sum(click),nBasket=sum(basket),norder=sum(order)) %>%
+    arrange(desc(nClick))
+  potential_recommendations <- potential_recommendations %>% 
+    mutate(kennzahl = (nClick*alpha + nBasket*beta + norder*gamma)/sum(alpha,beta,gamma))
+  potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
+    filter(itemID != activeItem) %>% slice_max(kennzahl,n=10) #gibt mehr als 10 raus, wegen gleichen Werten 
+  list_of_poten_rec <- as.list(potential_recommendations$itemID) 
+  return(list_of_poten_rec)
+}
+### Test der Funktion
+Recommendation_function_inDupSes(76465,0.2,0.3,0.5)
+
+##Recommendation Function schlechter Fall
+Notausgang_funktion <- function(activeItem){
+  selected_features <- totalInfo %>% filter(itemID==activeItem) %>%
+    select(itemID,author,mainTopic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
+  if (nrow(selected_features) == 0){
+    return(list())
+  }
+  this_author <- selected_features$author         #als chr darstellen 
+  this_publisher <- selected_features$publisher
+  this_genre <- selected_features$mainTopic
+  items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
+  nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
+  nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random Bücher mit dem gleichen (Publisher oder author) und mainTopic
+  return(nimm_5)
+}
+### Test der Funktion
+Notausgang_funktion(999)
+
+##Struktur von finalen Funktion
+activeItem <- 999
+activeItem <- totalInfo %>% filter(itemID==activeItem)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
+proveSubtopics <- activeItem %>% select(uniteTopics) %>% is.na()
+proveKlappentext <- activeItem %>% select(Beschreibung) %>% is.na()
+
+#Fall_1: Subtopic + Klappentext + inDupSes =alle sind True
+if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == TRUE){
+  print("fall_1")
+}
+
+#Fall_2: Subtopic + inDupSes .   kein Klappentext == NA 
+if(proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == TRUE){
+  print("Fall_2")
+}
+
+#Fall_3:Subtopic + Klappentext. Nicht in dup.ses.
+if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == FALSE){
+  print("fall_3")
+}
+#Fall_4: Nur Subtopic Simularity, kein KT, nicht in Dup.ses.   #Obwohl ich bin mir nicht sicher, ob dieser Fall kommt oder soll gleich NOTAUSGANGFUNKTION angeschaltet werden
+if (proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == FALSE){
+  print("fall_4")
+  }else {
+    Notausgang_funktion(activeItem)
+  }
