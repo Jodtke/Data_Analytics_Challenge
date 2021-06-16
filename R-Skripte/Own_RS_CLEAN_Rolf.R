@@ -36,7 +36,14 @@ library(tm)
 
 #items6 <- read.csv("./Data/items6.csv", encoding = "UTF-8")
 
-items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
+items <- read_csv(file="./Data/items7.csv", col_names=T, col_types=cols(
+  itemID=col_factor(),
+  title=col_character(),
+  author=col_character(),
+  publisher=col_character(),
+  mainTopic=col_factor(),
+  uniteTopics=col_factor()
+))
 
 # Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Genre
 AuthMat <- items7 %>% 
@@ -135,7 +142,7 @@ object.size(CosineSparse)
 # Import von Items
 items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
 
-items7[duplicated(items7$title),] %>% nrow()
+items[duplicated(items$title),] %>% nrow()
 # haben 6474 Titel die gleich hei?en - m?ssen wir rausschmei?en
 
 # Die Subtopics, die nur [] sind, sollen durch NAs ersetzt werden
@@ -151,12 +158,12 @@ items7[duplicated(items7$title),] %>% nrow()
 # DARF MAN SO NICHT MACHEN!!! Sonst fliegen auch ItemIDs raus, die in Evaluation sind. Man kann dann nicht mehr joinen -.-'
 
 ## Import der Transactions-Daten
-transactions <- as.tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
+transactions <- as_tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
 
 # Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
 # die ausgibt, ob ein Item in Transactions vorkommt
 
-joined_oR <- left_join(transactions, items7, by = "itemID")
+joined_oR <- left_join(transactions, items, by = "itemID")
 
 itemsInTrans <- joined_oR %>% 
   select(itemID) %>% 

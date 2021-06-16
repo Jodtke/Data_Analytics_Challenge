@@ -68,16 +68,5 @@ write_csv(items2_tbl, file="./Data/items2.csv", col_names=T)
 ## testweise einlesen
 items2 <- read_csv(file="./Data/items2.csv", col_names=T)
 
-########### alternativ: mit Trimmer-Funktion --> Funktioniert noch nicht ganz? ): ##########
-mainTopic_trimmer <- function(x) {
-  for (idx in 1:length(x)) {
-    if (nchar(idx) > 3) {
-      str_trunc(idx, width=3, side="right", ellipsis="")
-    } else {
-      idx = idx
-    }
-  }
-}
-
 
 
