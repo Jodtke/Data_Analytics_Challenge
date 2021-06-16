@@ -23,7 +23,7 @@ library(parallelMap)
 library(parallel)
 library(proxyC)
 library(tm)
-
+library(dplyr)
 ### DatensÃ¤tze laden
 
 # Datensatz mit Item-Informationen
@@ -119,14 +119,14 @@ dup.ses <- joined_oR[joined_oR$sessionID %in%
 # Erstellung der Variable inDupSes, welche darÃ¼ber informiert, ob sich ein Item
 # in Dup.Ses befindet oder nicht
 inDupSes <- dup.ses %>% 
-  select(itemID) %>% 
+  dplyr::select(itemID) %>% 
   unique() %>% 
   mutate(inDupSes = TRUE)
 
 # Erstellung der Variable inTransactions, welche darÃ¼ber informiert, ob sich ein 
 # Item transactions befindet oder nicht 
 itemsInTrans <- joined_oR %>% 
-  select(itemID) %>% 
+  dplyr::select(itemID) %>% 
   unique() %>% 
   mutate(inTransactions = TRUE)
 
@@ -134,7 +134,7 @@ itemsInTrans <- joined_oR %>%
 # mindestens einmal angeklickt wurde oder nicht 
 clicked <- joined_oR %>% 
   filter(click > 0) %>%
-  select(itemID) %>% 
+  dplyr::select(itemID) %>% 
   unique() %>% 
   mutate(clicked = TRUE)
 
@@ -142,7 +142,7 @@ clicked <- joined_oR %>%
 # mindestens einmal in den Warenkorb gelegt wurde oder nicht
 basket <- joined_oR %>%
   filter(basket > 0) %>% 
-  select(itemID) %>% 
+  dplyr::select(itemID) %>% 
   unique() %>% 
   mutate(basket = TRUE)
 
@@ -150,7 +150,7 @@ basket <- joined_oR %>%
 # mindestens einmal gekauft wurde oder nicht
 ordered <- joined_oR %>%
   filter(order > 0) %>% 
-  select(itemID) %>% 
+  dplyr::select(itemID) %>% 
   unique() %>% 
   mutate(ordered = TRUE)
 
@@ -228,6 +228,10 @@ activeAuthorAndTitel <- evaluation %>% left_join(totalInfo, by = "itemID")
 rm(evaluation)
 
 ### Defintion von Funktionen
+normalize <- function(x){
+  norm <- x / sum(x)
+  return(norm)
+}
 
 ### Definition der Funktion 'makeDTM'
 
@@ -398,7 +402,7 @@ TM_Recommendations <- function(activeItem){
   topRecc <- top5Recc[top5Recc != 0]
   # hier kann man Ã¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
-  
+  top5Recc <- normalize(top5Recc)
   #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
   return(topRecc)
   
@@ -439,7 +443,7 @@ UniteTopics_Recommendations <- function(activeItem) {
 ### Test der Funktionen
 
 tic("Start TM_Rec")  
-TM_Recommendations(999)
+TM_Recommendations(19194)
 toc()
 
 tic("Start ST_Rec")
@@ -450,9 +454,6 @@ toc()
 Recommendation_function_inDupSes <- function(activeItem,alpha,beta,gamma){
   this_ses <- dup.ses %>% group_by(sessionID) %>%   
     filter(itemID==activeItem) %>% select(sessionID)
-  if (nrow(this_ses) == 0){
-    return(list())
-  }
   this_ses <- this_ses$sessionID
   this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID) 
   potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItem)%>% 
@@ -461,9 +462,11 @@ Recommendation_function_inDupSes <- function(activeItem,alpha,beta,gamma){
   potential_recommendations <- potential_recommendations %>% 
     mutate(kennzahl = (nClick*alpha + nBasket*beta + norder*gamma)/sum(alpha,beta,gamma))
   potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
-    filter(itemID != activeItem) %>% slice_max(kennzahl,n=10) #gibt mehr als 10 raus, wegen gleichen Werten 
-  list_of_poten_rec <- as.list(potential_recommendations$itemID) 
-  return(list_of_poten_rec)
+    filter(itemID != activeItem) #%>% slice_max(kennzahl,n=10)  
+  item_names <- as.character(potential_recommendations$itemID)
+  kpi <- potential_recommendations$kennzahl
+  names(kpi) <- item_names
+  return(kpi)
 }
 ### Test der Funktion
 Recommendation_function_inDupSes(76465,0.2,0.3,0.5)
@@ -472,9 +475,6 @@ Recommendation_function_inDupSes(76465,0.2,0.3,0.5)
 Notausgang_funktion <- function(activeItem){
   selected_features <- totalInfo %>% filter(itemID==activeItem) %>%
     select(itemID,author,mainTopic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
-  if (nrow(selected_features) == 0){
-    return(list())
-  }
   this_author <- selected_features$author         #als chr darstellen 
   this_publisher <- selected_features$publisher
   this_genre <- selected_features$mainTopic
@@ -486,29 +486,74 @@ Notausgang_funktion <- function(activeItem){
 ### Test der Funktion
 Notausgang_funktion(999)
 
+
+
 ##Struktur von finalen Funktion
-activeItem <- 999
-activeItem <- totalInfo %>% filter(itemID==activeItem)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
-proveSubtopics <- activeItem %>% select(uniteTopics) %>% is.na()
-proveKlappentext <- activeItem %>% select(Beschreibung) %>% is.na()
+activeItem <- 19194
+activeItem1 <- totalInfo %>% filter(itemID==activeItem)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
+noSubtopics <- activeItem1 %>% select(uniteTopics) %>% is.na()
+noKlappentext <- activeItem1 %>% select(Beschreibung) %>% is.na()
 
 #Fall_1: Subtopic + Klappentext + inDupSes =alle sind True
-if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == TRUE){
-  print("fall_1")
+if (proveSubtopics == FALSE & proveKlappentext == FALSE & activeItem$inDupSes == TRUE){
+  result_TM <- TM_Recommendations(activeItem)
+  itemsFromTM <- names(result_TM)
+  
+  result_Ut <- UniteTopics_Recommendations(activeItem)
+  itemsFromUt <- names(result_Ut)
+  result_inDupSes <- Recommendation_function_inDupSes(activeItem,0.2,0.3,0.5)
+  itemsFromDupSes <- names(result_inDupSes)
+  all_potential_recom <- c(itemsFromTM, itemsFromUt,itemsFromDupSes)
+  finalTable <- sort(table(all_potential_recom),decreasing = T)
+  equal3 <- which(finalTable == 3)
+  finalRecom <- c()
+  finalRecom <- cbind(result_Ut[names(equal3)], result_TM[names(equal3)],result_inDupSes[names(equal3)]) %>% 
+    rowSums(na.rm = T) %>%  sort(decreasing = T ) %>% head(5)
+  if (length(finalRecom) < 5){
+    values_left <- 5- length(finalRecom)
+    equal2 <- which(finalTable == 2)
+    resultequal2 <- finalTable[equal2]
+    finalRecom2 <- cbind(result_Ut[names(equal2)], result_TM[names(equal2)],result_inDupSes[names(equal2)]) %>% 
+      rowSums(na.rm = T) %>%  sort(decreasing = T ) %>% head(values_left)
+    finalRecom <- c(finalRecom , finalRecom2)
+  }
+  if (length(finalRecom) < 5){
+    values_left <- 5- length(finalRecom)
+    equal1 <- which(finalTable == 1)
+    resultequal1 <- finalTable[equal1]
+    finalRecom3 <- cbind(result_Ut[names(equal1)], result_TM[names(equal1)],result_inDupSes[names(equal1)]) %>% 
+      rowSums(na.rm = T) %>%  sort(decreasing = T ) %>% head(values_left)
+    finalRecom <- c(finalRecom , finalRecom2, finalRecom3)
+  }
 }
+finalRecom
 
+ cbind(result_Ut[names(equal2)], result_TM[names(equal2)],result_inDupSes[names(equal2)]) %>% rowSums(na.rm = T) %>% 
+  sort(decreasing = T ) %>% head(5)
+
+
+result_inDupSes["10150"]
 #Fall_2: Subtopic + inDupSes .   kein Klappentext == NA 
-if(proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == TRUE){
-  print("Fall_2")
+if(proveSubtopics == FALSE & proveKlappentext == TRUE & activeItem$inDupSes == TRUE){
+  result_Ut <- UniteTopics_Recommendations(activeItem)
+  itemsFromUt <- names(result_Ut)
+  result_inDupSes <- Recommendation_function_inDupSes(activeItem,0.2,0.3,0.5)
+  itemsFromDupSes <- names(result_inDupSes)
 }
 
 #Fall_3:Subtopic + Klappentext. Nicht in dup.ses.
 if (proveSubtopics == FALSE && proveKlappentext == FALSE && activeItem$inDupSes == FALSE){
-  print("fall_3")
+  result_Ut <- UniteTopics_Recommendations(activeItem)
+  itemsFromUt <- names(result_Ut)
+  result_TM <- TM_Recommendations(activeItem)
+  itemsFromTM <- names(result_TM)
+  
 }
 #Fall_4: Nur Subtopic Simularity, kein KT, nicht in Dup.ses.   #Obwohl ich bin mir nicht sicher, ob dieser Fall kommt oder soll gleich NOTAUSGANGFUNKTION angeschaltet werden
 if (proveSubtopics == FALSE && proveKlappentext == TRUE && activeItem$inDupSes == FALSE){
-  print("fall_4")
+  result_Ut <- UniteTopics_Recommendations(activeItem)
+  itemsFromUt <- names(result_Ut)
   }else {
     Notausgang_funktion(activeItem)
   }
+activeAuthorAndTitel[999,]
