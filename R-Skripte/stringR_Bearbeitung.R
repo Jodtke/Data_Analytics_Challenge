@@ -28,7 +28,7 @@ items[, 2:6] <- apply(items[, 2:6], MARGIN=2, FUN=function(x) str_trim(string=x,
 ### alle strings in kleinen buchstaben darstellen --> im default "english" eingestellt, allerdings mehr bücher auf deutsch im datensatz enthalten
 items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_to_lower(string=x, locale="de"))
 ### komische sonderzeichen ersetzen durch "" 
-items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=" "))
+items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""))
 head(items, n=20)
 
 ### subTopics separat von sonderzeichen befreien
@@ -119,7 +119,7 @@ head(FCD_tibble, n=20)
 
 ### items datensatz für bearbeitung neu und extra einlesen, da kommas zwischen den subtopics NICHT entfernt werden
 # NICHT ALS NEUE ITEM DATEI ABSPEICHERN!
-items <- read_csv(file="./Data/items_bearbeitet_ALT/items5.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),
@@ -280,7 +280,7 @@ object.size(CosineSparse_subtopics) ### knapp 1.2 GB !!
 #Matrix::writeMM(obj=CosineSparse_subtopics, file="CosineSparse_subtopics.mtx")
 
 ########### items-uniteTopics-Matrix nach gleichem Schema erstellen ######
-items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),
