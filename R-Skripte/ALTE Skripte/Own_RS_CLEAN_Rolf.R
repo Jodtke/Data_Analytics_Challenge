@@ -46,7 +46,7 @@ items <- read_csv(file="./Data/items7.csv", col_names=T, col_types=cols(
 ))
 
 # Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Genre
-AuthMat <- items7 %>% 
+AuthMat <- items %>% 
   group_by(author, mainTopic) %>% 
   dplyr::summarise(n = n()) %>% 
   spread(key = mainTopic, value = n)
@@ -140,7 +140,7 @@ object.size(CosineSparse)
 # dessen kNearestNeighbors sowie deren geschriebene Bücher ausgeben lassen.
 
 # Import von Items
-items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
+items <- read.csv("./Data/items7.csv", encoding = "UTF-8")
 
 items[duplicated(items$title),] %>% nrow()
 # haben 6474 Titel die gleich hei?en - m?ssen wir rausschmei?en
@@ -158,8 +158,13 @@ items[duplicated(items$title),] %>% nrow()
 # DARF MAN SO NICHT MACHEN!!! Sonst fliegen auch ItemIDs raus, die in Evaluation sind. Man kann dann nicht mehr joinen -.-'
 
 ## Import der Transactions-Daten
-transactions <- as_tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
-
+transactions <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
+  sessionID = col_factor(),
+  itemID = col_factor(),
+  click = col_integer(),
+  basket = col_integer(),
+  order = col_integer()
+))
 # Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
 # die ausgibt, ob ein Item in Transactions vorkommt
 
@@ -173,7 +178,7 @@ itemsInTrans <- joined_oR %>%
 #sum(itemsWithTrans$inTransactions)
 # sind 24909 Items
 
-totalInfo <- items7 %>% left_join(itemsInTrans, by = "itemID")
+totalInfo <- items %>% left_join(itemsInTrans, by = "itemID")
 totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
 
 # Verknüpfen von Transactions mit Items, sodass eine weitere Spalte angefügt wird,
@@ -228,7 +233,7 @@ totalInfo$inDupSes[is.na(totalInfo$inDupSes)] <- FALSE
 
 # Import der Crawler-Daten
 #FCD <- readRDS("./Data/FinaleCrawlerDatenUpdated.rds")
-FCD_tibble <- as.tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
+FCD_tibble <- as_tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
 
 # # https://stackoverflow.com/questions/49564748/extract-multiple-elements-from-a-list-of-lists-lapply
 # FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15))))
@@ -274,7 +279,9 @@ totalInfo <- totalInfo %>%
 #rm(items7)
 
 # Laden des Evaluationsdatensatz
-evaluation <- read.csv("./Data/evaluation.csv")
+evaluation <- read_csv("./Data/evaluation.csv", col_types = cols(
+  itemID = col_factor()
+))
 
 activeAuthorAndTitel <- evaluation %>% 
   left_join(totalInfo, by = "itemID")
@@ -608,5 +615,5 @@ TM_Recommendations <- function(activeItem){
 }
 
 tic("Start function")  
-TM_Recommendations(999)
+TM_Recommendations(187)
 toc()
