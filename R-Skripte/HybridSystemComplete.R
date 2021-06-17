@@ -28,16 +28,32 @@ library(tm)
 ### DatensÃÂ¤tze laden
 
 # Datensatz mit Item-Informationen
-items7 <- read.csv("./Data/items7.csv", encoding = "UTF-8")
+items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
+  itemID=col_factor(),
+  title=col_factor(),
+  author=col_factor(),
+  publisher=col_factor(),
+  main.topic=col_factor(),
+  subtopics=col_character()
+))
+head(items, n=20)
+glimpse(items)
 
 # Datensatz mit Transaktionsdaten
-transactions <- as_tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
-
+transactions <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
+  sessionID = col_factor(),
+  itemID = col_factor(),
+  click = col_integer(),
+  basket = col_integer(),
+  order = col_integer()
+))
 # Crawler-Daten mit Klappentexten
 FCD_tibble <- as_tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
 
 # Evaluations-Daten
-evaluation <- read.csv("./Data/evaluation.csv")
+evaluation <-  read.csv(file = "./Data/evaluation.csv", header = T, quote = "", row.names = NULL, stringsAsFactors = F)
+evaluation_tbl <- as_tibble(evaluation)
+evaluation_tbl$itemID <- as.factor(evaluation_tbl$itemID)
 
 ### DatensÃÂ¤tze transformieren und ergÃÂ¤nzende erstellen
 
@@ -111,7 +127,7 @@ rm(itemIDs, itemMat)
 
 # ZusammenfÃÂ¼gen der Transaktions- und Item-Daten, welche als Ausgangspunkt
 # zur Gewinnung weiterer Features dienen
-joined_oR <- left_join(transactions, items7, by = "itemID")
+joined_oR <- left_join(transactions, items, by = "itemID")
 
 # Erstellung von dup.ses, um im spÃÂ¤teren Verlauf eine Art ARM anwenden zu kÃÂ¶nnen
 dup.ses <- joined_oR[joined_oR$sessionID %in%
@@ -185,7 +201,7 @@ FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
 # - titleUndBeschreibung (titel + Beschreibung)
 
 # VerknÃÂ¼pfung items7 mit itemsInTrans ÃÂ¼ber die itemID
-totalInfo <- items7 %>% left_join(itemsInTrans, by = "itemID")
+totalInfo <- items %>% left_join(itemsInTrans, by = "itemID")
 # ÃÂberschreibung der NA mit FALSE
 totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
 
@@ -216,7 +232,7 @@ totalInfo <- totalInfo %>% left_join(FCD_tibble, by = "title")
 totalInfo <- totalInfo %>% mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
 
 # Nicht mehr benÃ¶tigte DatensÃ¤tze lÃ¶schen, um Speicherplatz zu sparen
-rm(clicked, basket, ordered, inDupSes, itemsInTrans, items7, transactions, joined_oR, FCD_tibble)
+rm(clicked, basket, ordered, inDupSes, itemsInTrans, items, transactions, joined_oR, FCD_tibble)
 
 ### Erstellung von activeAuthorAndTitel
 
@@ -513,7 +529,7 @@ Notausgang_funktion <- function(activeItem){
   
   items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
   
-  set.seed(123)
+  set.seet(123)
   nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
   
   nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random BÃ¼cher mit dem gleichen (Publisher oder author) und mainTopic
@@ -525,7 +541,7 @@ Notausgang_funktion <- function(activeItem){
 # Notausgang_funktion(999)
 
 ##Struktur von finalen Funktion
-# activeItem <- 999 # 4 für Fall 1, 25 für Fall 2, 2 für Fall 3, 23 für Fall 4
+# activeItem <- 9 # 4 für Fall 1, 25 für Fall 2, 2 für Fall 3, 23 für Fall 4
 # 
 # weightTM = 0.33
 # weightUT = 0.33
@@ -735,11 +751,9 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
 
 ### Test HybridRecommendation
 tic("Start Hybrid Recommendation")
-HybridRecommendation(619)
+HybridRecommendation(187)
 toc()
 
 # FRAGE: Was passiert, wenn wir 5+ Items haben, mit einer Similarity von 1?
 # Ist insbesondere im letzten Fall realistisch
-
-
 
