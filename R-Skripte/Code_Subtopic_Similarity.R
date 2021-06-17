@@ -26,7 +26,7 @@ item_toks <- tokens(items$subtopics)
 items_dtm <- dfm(x=item_toks, verbose=quanteda_options("verbose"))
 #document frequency per term
 doc_freq <- docfreq(items_dtm)
-items_dtm2000 <- items_dtm[1:2000, ]
+items_dtm2000 <- items_dtm#[1:2000, ]
 
 #just take terms which occur in more than just one document (for similarity)
 items_dtm2000 <- items_dtm2000[, doc_freq >= 2]
@@ -40,6 +40,21 @@ cos_similarity <- function(A,B) {
   return(result)
 }
 
-cosine_dtm <- cosine(t(as.matrix(items_dtm2000)))
-head(sort(cosine_dtm[177,], decreasing = TRUE))
+### NA'S in items_dtm2000 durch 0 ersetzen für leichtere Berechnungen
+items_dtm2000[is.na(items_dtm2000)] <- 0
+### struktur von items_dtm anzeigen lassen
+str(items_dtm2000) ## ???
+
+tictoc::tic("Dauer Cosine mit proxyC und drop0 = TRUE")
+parallelMap::parallelStartSocket(cpus = parallel::detectCores())
+
+cosine_dtm <- proxyC::simil(items_dtm2000, method = "cosine", drop0 = TRUE)
+#cosine_dtm <- lsa::cosine(t(as.matrix(items_dtm2000)))
+
+parallelMap::parallelStop()
+tictoc::toc()
+
+# für spezifische items die 5 höchsten similarities ausgeben lassen
+head(sort(cosine_dtm[187,], decreasing = TRUE))
+
 
