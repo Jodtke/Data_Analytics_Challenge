@@ -119,7 +119,7 @@ head(FCD_tibble, n=20)
 
 ### items datensatz für bearbeitung neu und extra einlesen, da kommas zwischen den subtopics NICHT entfernt werden
 # NICHT ALS NEUE ITEM DATEI ABSPEICHERN!
-items <- read_csv(file="./Data/items_bearbeitet_ALT/items5.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),
@@ -280,7 +280,7 @@ object.size(CosineSparse_subtopics) ### knapp 1.2 GB !!
 #Matrix::writeMM(obj=CosineSparse_subtopics, file="CosineSparse_subtopics.mtx")
 
 ########### items-uniteTopics-Matrix nach gleichem Schema erstellen ######
-items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),
