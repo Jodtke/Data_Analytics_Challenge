@@ -9,7 +9,7 @@ library(proxyC) ### berechnung der cosine similarities
 library(Matrix) ### abspeichern in speziellem Harwell-Boeing-Format für matrizen
 
 ### items daten einlesen
-items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),
@@ -64,9 +64,9 @@ head(items, n=20)
 rm(items_bearb, rem_dup_word)
 
 ### neues csv "items7" schreiben
-write_csv(items, file="./Data/items7.csv", col_names=T)
+write_csv(items, file="./Data/items6.csv", col_names=T)
 ### testweise einlesen
-items2 <- read_csv(file="./Data/items7.csv", col_names=T, col_types=cols(
+items2 <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
    itemID=col_factor(),
    title=col_character(),
    author=col_character(),
@@ -119,7 +119,7 @@ head(FCD_tibble, n=20)
 
 ### items datensatz für bearbeitung neu und extra einlesen, da kommas zwischen den subtopics NICHT entfernt werden
 # NICHT ALS NEUE ITEM DATEI ABSPEICHERN!
-items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
+items <- read_csv(file="./Data/items_bearbeitet_ALT/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
   author=col_character(),

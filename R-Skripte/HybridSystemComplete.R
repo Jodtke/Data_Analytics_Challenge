@@ -513,6 +513,7 @@ Notausgang_funktion <- function(activeItem){
   
   items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
   
+  set.seed(123)
   nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
   
   nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random BÃ¼cher mit dem gleichen (Publisher oder author) und mainTopic
@@ -734,9 +735,11 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
 
 ### Test HybridRecommendation
 tic("Start Hybrid Recommendation")
-HybridRecommendation(999)
+HybridRecommendation(619)
 toc()
 
 # FRAGE: Was passiert, wenn wir 5+ Items haben, mit einer Similarity von 1?
 # Ist insbesondere im letzten Fall realistisch
+
+
 
