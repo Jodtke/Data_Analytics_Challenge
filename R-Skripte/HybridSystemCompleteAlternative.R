@@ -24,53 +24,33 @@ library(parallel)
 library(proxyC)
 library(tm)
 
-### DatensÃÂ¤tze laden
+### DatensÃÂÃÂ¤tze laden
 
 # Datensatz mit Item-Informationen
-items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
-  itemID=col_integer(),
-  title=col_character(),
-  author=col_character(),
-  publisher=col_character(),
-  mainTopic=col_character(),
-  uniteTopics=col_character()
-))
-head(items, n=20)
-glimpse(items)
+items6 <- read.csv("./Data/items6.csv", encoding = "UTF-8")
 
 # Datensatz mit Transaktionsdaten
-transactions <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
-  sessionID = col_integer(),
-  itemID = col_integer(),
-  click = col_integer(),
-  basket = col_integer(),
-  order = col_integer()
-))
-# Crawler-Daten mit Klappentexten
-FCD_tibble <- read_csv(file="./Data/KlappentexteUndTitel.csv", col_names=T, col_types=cols(
-     title=col_character(),
-     Beschreibung=col_character()
-))
-  
-# Evaluations-Daten
-evaluation <-  read.csv(file = "./Data/evaluation.csv", header = T, quote = "", row.names = NULL, stringsAsFactors = F)
-evaluation$itemID <- as.integer(evaluation$itemID)
-evaluation_tbl <- as_tibble(evaluation)
-evaluation_tbl$itemID <- as.integer(evaluation_tbl$itemID)
+transactions <- as_tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
 
-### DatensÃÂ¤tze transformieren und ergÃÂ¤nzende erstellen
+# Crawler-Daten mit Klappentexten
+FCD_tibble <- as_tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
+
+# Evaluations-Daten
+evaluation <- read.csv("./Data/evaluation.csv")
+
+### DatensÃÂÃÂ¤tze transformieren und ergÃÂÃÂ¤nzende erstellen
 
 ### Cosine Similarity Matrix erstellen (basierend auf Subtopics)
 
 # Erstelle Similarity-Matrix, welche die Cosine Similarity und somit die
-# ÃÂhnlichkeit zwischen den Autoren berechnet.
-# Dabei wird BerÃÂ¼cksichtigt, wie viele BÃÂ¼cher die Autoren im jeweiligen
+# ÃÂÃÂhnlichkeit zwischen den Autoren berechnet.
+# Dabei wird BerÃÂÃÂ¼cksichtigt, wie viele BÃÂÃÂ¼cher die Autoren im jeweiligen
 # Main Topic und Sub Topic geschrieben haben
 
 # Imporiteren der AuthMat_subtopics aus anderem Skript
 AuthMat <- read.csv("./Data/AuthMat_subtopics.csv", check.names = FALSE)
 
-# Autorennamen abspeichern, da diese spÃÂ¤ter als rownames eingefÃÂ¼gt werden
+# Autorennamen abspeichern, da diese spÃÂÃÂ¤ter als rownames eingefÃÂÃÂ¼gt werden
 Authors <- AuthMat$author
 
 # Spalten in integer konvertieren
@@ -97,15 +77,15 @@ CosineSparse <- proxyC::simil(AuthMatSparse, method = "cosine", drop0 = TRUE)
 parallelStop()
 toc()
 
-# Nicht mehr benÃ¶tigte DatensÃ¤tze lÃ¶schen, um Speicherplatz zu sparen
+# Nicht mehr benÃÂ¶tigte DatensÃÂ¤tze lÃÂ¶schen, um Speicherplatz zu sparen
 rm(Authors, AuthMat, AuthMatSparse)
 
-### Erstellung Item-Matrix, welche AusprÃ¤gung in entsprechendem Subtopic enthÃ¤lt
+### Erstellung Item-Matrix, welche AusprÃÂ¤gung in entsprechendem Subtopic enthÃÂ¤lt
 
 # Imporiteren der itemMat_subtopics aus anderem Skript
 itemMat <- read.csv("./Data/itemMat_subtopics.csv", check.names = FALSE)
 
-# ItemID's abspeichern, da diese spÃ¤ter als rownames eingefÃ¼gt werden
+# ItemID's abspeichern, da diese spÃÂ¤ter als rownames eingefÃÂ¼gt werden
 itemIDs <- as.character(itemMat$itemID)
 
 # Spalten in integer konvertieren
@@ -123,34 +103,34 @@ rownames(itemMat) <- itemIDs
 # Die Matrix in eine sparse Matrix konvertieren, um Speicherplatz zu sparen
 itemMatSparse <- as(itemMat, "sparseMatrix")
 
-# Nicht mehr benÃ¶tigte DatensÃ¤tze lÃ¶schen, um Speicherplatz zu sparen
+# Nicht mehr benÃÂ¶tigte DatensÃÂ¤tze lÃÂ¶schen, um Speicherplatz zu sparen
 rm(itemIDs, itemMat)
 
 ### joined_oR erstellen
 
-# ZusammenfÃÂ¼gen der Transaktions- und Item-Daten, welche als Ausgangspunkt
+# ZusammenfÃÂÃÂ¼gen der Transaktions- und Item-Daten, welche als Ausgangspunkt
 # zur Gewinnung weiterer Features dienen
-joined_oR <- left_join(transactions, items, by = "itemID")
+joined_oR <- left_join(transactions, items6, by = "itemID")
 
-# Erstellung von dup.ses, um im spÃÂ¤teren Verlauf eine Art ARM anwenden zu kÃÂ¶nnen
+# Erstellung von dup.ses, um im spÃÂÃÂ¤teren Verlauf eine Art ARM anwenden zu kÃÂÃÂ¶nnen
 dup.ses <- joined_oR[joined_oR$sessionID %in%
                        joined_oR$sessionID[duplicated(joined_oR$sessionID)],]
 
-# Erstellung der Variable inDupSes, welche darÃÂ¼ber informiert, ob sich ein Item
+# Erstellung der Variable inDupSes, welche darÃÂÃÂ¼ber informiert, ob sich ein Item
 # in Dup.Ses befindet oder nicht
 inDupSes <- dup.ses %>% 
   select(itemID) %>% 
   unique() %>% 
   mutate(inDupSes = TRUE)
 
-# Erstellung der Variable inTransactions, welche darÃÂ¼ber informiert, ob sich ein 
+# Erstellung der Variable inTransactions, welche darÃÂÃÂ¼ber informiert, ob sich ein 
 # Item transactions befindet oder nicht 
 itemsInTrans <- joined_oR %>% 
   select(itemID) %>% 
   unique() %>% 
   mutate(inTransactions = TRUE)
 
-# Erstellung der Variable clicked, welche darÃÂ¼ber informiert, ob ein Item 
+# Erstellung der Variable clicked, welche darÃÂÃÂ¼ber informiert, ob ein Item 
 # mindestens einmal angeklickt wurde oder nicht 
 clicked <- joined_oR %>% 
   filter(click > 0) %>%
@@ -158,7 +138,7 @@ clicked <- joined_oR %>%
   unique() %>% 
   mutate(clicked = TRUE)
 
-# Erstellung der Variable basket, welche darÃÂ¼ber informiert, ob ein Item 
+# Erstellung der Variable basket, welche darÃÂÃÂ¼ber informiert, ob ein Item 
 # mindestens einmal in den Warenkorb gelegt wurde oder nicht
 basket <- joined_oR %>%
   filter(basket > 0) %>% 
@@ -166,7 +146,7 @@ basket <- joined_oR %>%
   unique() %>% 
   mutate(basket = TRUE)
 
-# Erstellung der Variable ordered, welche darÃÂ¼ber informiert, ob ein Item 
+# Erstellung der Variable ordered, welche darÃÂÃÂ¼ber informiert, ob ein Item 
 # mindestens einmal gekauft wurde oder nicht
 ordered <- joined_oR %>%
   filter(order > 0) %>% 
@@ -176,8 +156,8 @@ ordered <- joined_oR %>%
 
 ### Reduzierung der Crawler-Daten
 
-# Da diverse BÃÂ¼cher mit dem identischen Titel vorliegen, die Item-Daten mit den
-# Crawler-Daten jedoch ÃÂ¼ber die Titel gejoint werden, mÃÂ¼ssen zunÃÂ¤chst alle
+# Da diverse BÃÂÃÂ¼cher mit dem identischen Titel vorliegen, die Item-Daten mit den
+# Crawler-Daten jedoch ÃÂÃÂ¼ber die Titel gejoint werden, mÃÂÃÂ¼ssen zunÃÂÃÂ¤chst alle
 # Duplikate basierend auf den Titeln aussoritert werden.
 FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
 # ACHTUNG: Hier besteht immer noch Verbesserungspotential!
@@ -188,7 +168,7 @@ FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
 
 ### Erstellung des tibbles totalInfo
 
-# Erstelle tibble totalInfo, welches folgende Informationen enthÃÂ¤lt:
+# Erstelle tibble totalInfo, welches folgende Informationen enthÃÂÃÂ¤lt:
 # - itemID
 # - titel
 # - autor
@@ -203,48 +183,48 @@ FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
 # - Beschreibung
 # - titleUndBeschreibung (titel + Beschreibung)
 
-# VerknÃÂ¼pfung items6 mit itemsInTrans ÃÂ¼ber die itemID
-totalInfo <- items %>% left_join(itemsInTrans, by = "itemID")
-# ÃÂberschreibung der NA mit FALSE
+# VerknÃÂÃÂ¼pfung items6 mit itemsInTrans ÃÂÃÂ¼ber die itemID
+totalInfo <- items6 %>% left_join(itemsInTrans, by = "itemID")
+# ÃÂÃÂberschreibung der NA mit FALSE
 totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
 
-# VerknÃÂ¼pfung von totalInfo mit clicked ÃÂ¼ber die itemID
+# VerknÃÂÃÂ¼pfung von totalInfo mit clicked ÃÂÃÂ¼ber die itemID
 totalInfo <- totalInfo %>% left_join(clicked, by = "itemID")
-# ÃÂberschreibung der NA mit FALSE
+# ÃÂÃÂberschreibung der NA mit FALSE
 totalInfo$clicked[is.na(totalInfo$clicked)] <- FALSE
 
-# VerknÃÂ¼pfung von totalInfo mit basket ÃÂ¼ber die itemID
+# VerknÃÂÃÂ¼pfung von totalInfo mit basket ÃÂÃÂ¼ber die itemID
 totalInfo <- totalInfo %>% left_join(basket, by = "itemID")
-# ÃÂberschreibung der NA mit FALSE
+# ÃÂÃÂberschreibung der NA mit FALSE
 totalInfo$basket[is.na(totalInfo$basket)] <- FALSE
 
-# VerknÃÂ¼pfung von totalInfo mit ordered ÃÂ¼ber die itemID
+# VerknÃÂÃÂ¼pfung von totalInfo mit ordered ÃÂÃÂ¼ber die itemID
 totalInfo <- totalInfo %>% left_join(ordered, by = "itemID")
-# ÃÂberschreibung der NA mit FALSE
+# ÃÂÃÂberschreibung der NA mit FALSE
 totalInfo$ordered[is.na(totalInfo$ordered)] <- FALSE
 
-# VerknÃÂ¼pfung von totalInfo mit inDupSes ÃÂ¼ber die itemID
+# VerknÃÂÃÂ¼pfung von totalInfo mit inDupSes ÃÂÃÂ¼ber die itemID
 totalInfo <- totalInfo %>% left_join(inDupSes, by = "itemID")
-# ÃÂberschreibung der NA mit FALSE
+# ÃÂÃÂberschreibung der NA mit FALSE
 totalInfo$inDupSes[is.na(totalInfo$inDupSes)] <- FALSE
 
-# VerknÃÂ¼pfung von totalInfo mit der Beschreibung (Klappentext) ÃÂ¼ber den Titel
+# VerknÃÂÃÂ¼pfung von totalInfo mit der Beschreibung (Klappentext) ÃÂÃÂ¼ber den Titel
 totalInfo <- totalInfo %>% left_join(FCD_tibble, by = "title")
 
 # Erzeugung der Variable titelUndBeschreibung, um Text Mining zu verbessern
 totalInfo <- totalInfo %>% mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
 
-# Nicht mehr benÃ¶tigte DatensÃ¤tze lÃ¶schen, um Speicherplatz zu sparen
-rm(clicked, basket, ordered, inDupSes, itemsInTrans, items, transactions, FCD_tibble)
+# Nicht mehr benÃÂ¶tigte DatensÃÂ¤tze lÃÂ¶schen, um Speicherplatz zu sparen
+rm(clicked, basket, ordered, inDupSes, itemsInTrans, items6, transactions, joined_oR, FCD_tibble)
 
 ### Erstellung von activeAuthorAndTitel
 
-# VerknÃÂ¼pfung des Evaulation-Tibbles mit totalInfo um sÃÂ¤mtliche Informationen
-# ÃÂ¼ber die Ziel-Items zu erhalten
+# VerknÃÂÃÂ¼pfung des Evaulation-Tibbles mit totalInfo um sÃÂÃÂ¤mtliche Informationen
+# ÃÂÃÂ¼ber die Ziel-Items zu erhalten
 
 activeAuthorAndTitel <- evaluation %>% left_join(totalInfo, by = "itemID")
 
-# Nicht mehr benÃ¶tigte DatensÃ¤tze lÃ¶schen, um Speicherplatz zu sparen
+# Nicht mehr benÃÂ¶tigte DatensÃÂ¤tze lÃÂ¶schen, um Speicherplatz zu sparen
 rm(evaluation)
 
 ### Defintion von Funktionen
@@ -262,7 +242,7 @@ normalize <- function(x){
 ### Definition der Funktion 'makeDTM'
 
 # Da im weiteren Verlauf Fallunterscheidungen (if-Statements) auftreten, 
-# mÃÂ¼sste der Code mehrmals kopiert und eingefÃÂ¼gt werden.Durch die Definition 
+# mÃÂÃÂ¼sste der Code mehrmals kopiert und eingefÃÂÃÂ¼gt werden.Durch die Definition 
 # einer Funktion sparen wir uns dieses Vorgehen, reduzieren dabei sogar noch 
 # Code-Redundanz und minimiern Gefahrenquellen durch manuelle Eingabe
 
@@ -279,9 +259,9 @@ makeDTM <- function(x) {
     tm_map(removeWords, stopwords("german")) %>%
     tm_map(removeWords, stopwords("french")) %>%
     tm_map(removeWords, stopwords("spanish")) %>% 
-    tm_map(removeWords, c("NA","Ã¢ÂÂ¢","ÃÂ»","ÃÂ®", "Ã¢ÂÂ", "ÃÂ¡", "ÃÂ¿", "Ã¢ÂÂ"))
+    tm_map(removeWords, c("NA","•","»","®", "–", "¡", "¿", "—"))
   
-  # Als nÃÂ¤chstes wird der Corpus in eine TF-IDF-Matrix ÃÂ¼berfÃÂ¼hrt:
+  # Als nÃÂÃÂ¤chstes wird der Corpus in eine TF-IDF-Matrix ÃÂÃÂ¼berfÃÂÃÂ¼hrt:
   DTM <- DocumentTermMatrix(Corpus, control = list(weighting = weightTfIdf))
   
   return(DTM)
@@ -290,13 +270,13 @@ makeDTM <- function(x) {
 
 ### Definition der Funktion 'makeAllTitles'
 
-# Da sowohl fÃ¼r die Klappentext-Similarity als auch fÃ¼r die Subtopic-Similarity
-# Ã¤hnliche Vorselektionen vorgenommen werden, bietet es sich an, eine Funktion
-# zu schreiben, die diese Ã¼bernimmt, um Code-Redundanzen zu vermeiden
+# Da sowohl fÃÂ¼r die Klappentext-Similarity als auch fÃÂ¼r die Subtopic-Similarity
+# ÃÂ¤hnliche Vorselektionen vorgenommen werden, bietet es sich an, eine Funktion
+# zu schreiben, die diese ÃÂ¼bernimmt, um Code-Redundanzen zu vermeiden
 
 makeAllTitles <- function(activeItem){
   
-  ## Cosine-KNN fÃÂ¼r TM #########################################################
+  ## Cosine-KNN fÃÂÃÂ¼r TM #########################################################
   
   activeAuthor1 <- activeAuthorAndTitel$author[activeItem] # hier loopen
   activeAuthor1
@@ -320,27 +300,27 @@ makeAllTitles <- function(activeItem){
     allTitelKNN <- totalInfo %>% 
       filter(author %in% aA1_top10NeigbhorsCos)
     
-    # Jetzt mÃÂ¼ssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
-    # zusammengefÃÂ¼hrt und die doc_id entsprechend vergeben werden
+    # Jetzt mÃÂÃÂ¼ssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
+    # zusammengefÃÂÃÂ¼hrt und die doc_id entsprechend vergeben werden
     
     activeTitel1MitBeschreibung <- totalInfo %>% 
       filter(title == activeTitel1) 
     
     allTitles <- rbind(activeTitel1MitBeschreibung, allTitelActAuth1, allTitelKNN)
     
-    # Hier auch nochmal die duplicates rausschmeiÃÂen
+    # Hier auch nochmal die duplicates rausschmeiÃÂÃÂen
     allTitles <- allTitles %>% distinct(itemID, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
     
     return(allTitles)
     
   } else {
     
-    aA1_top10NeigbhorsCos <-  aA1_NeighorsCos[aA1_NeighorsCos >= 0.9] 
+    aA1_top10NeigbhorsCos <-  aA1_NeighorsCos[aA1_NeighorsCos == 1] 
     # fraglich, ob man hier nicht vielleicht ">= 0.9" nimmt, anstatt "== 1"
     
     aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos) # nur noch deren Namen
     
-    # Bevor man diese diese nun fÃÂ¼r Text Mining verwenden kann, muss man eine doc_id
+    # Bevor man diese diese nun fÃÂÃÂ¼r Text Mining verwenden kann, muss man eine doc_id
     # in Spalte 1 hinzufgen und die Spalte 2 in 'text' umbenennen
     
     # Extrahiere alle weiteren Buchtitel des Ziel-Autoren 
@@ -371,15 +351,15 @@ makeAllTitles <- function(activeItem){
         filter(ordered == TRUE) 
     } 
     
-    # Jetzt mÃÂ¼ssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
-    # zusammengefÃÂ¼hrt und die doc_id entsprechend vergeben werden
+    # Jetzt mÃÂÃÂ¼ssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
+    # zusammengefÃÂÃÂ¼hrt und die doc_id entsprechend vergeben werden
     
     activeTitel1MitBeschreibung <- totalInfo %>% 
       filter(title == activeTitel1)
     
     allTitles <- rbind(activeTitel1MitBeschreibung, allTitelActAuth1, allTitelKNN)
     
-    # Hier auch nochmal die duplicates rausschmeiÃÂen
+    # Hier auch nochmal die duplicates rausschmeiÃÂÃÂen
     allTitles <- allTitles %>% distinct(itemID, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
     
     return(allTitles)
@@ -393,11 +373,11 @@ makeAllTitles <- function(activeItem){
 
 # Nachfolgend soll eien Funktion definiert werden, welche basierend auf
 # Titel-Und-Klappentext-Similarity einen Vektor mit itemID's ausgibt,
-# um so Buch/Item-Empfehlungen aussprechen zu kÃÂ¶nnen. Diese werden dann im
-# weiteren Verlauf den anderen Komponenten dieses hybriden Systems gegenÃÂ¼ber
+# um so Buch/Item-Empfehlungen aussprechen zu kÃÂÃÂ¶nnen. Diese werden dann im
+# weiteren Verlauf den anderen Komponenten dieses hybriden Systems gegenÃÂÃÂ¼ber
 # gestellt.
 
-TM_Recommendations <- function(activeItem, simThresh = 0.1){
+TM_Recommendations <- function(activeItem, simThresh = 0.014){
   
   allTitles <- makeAllTitles(activeItem)
   
@@ -408,7 +388,7 @@ TM_Recommendations <- function(activeItem, simThresh = 0.1){
   DTM <- makeDTM(allTitles)
   
   # Da man eine DTM nicht in eine sparseMatrix transformieren kann - das jedoch
-  # ein zentrales Kriterium fÃÂ¼r proxyC ist - mÃÂ¼ssen wir die cosine-Function aus
+  # ein zentrales Kriterium fÃÂÃÂ¼r proxyC ist - mÃÂÃÂ¼ssen wir die cosine-Function aus
   # einem anderen Paket benutzen
   
   tic("Dauer Cosine Similarity der Titel")
@@ -419,13 +399,13 @@ TM_Recommendations <- function(activeItem, simThresh = 0.1){
   parallelStop()
   toc()
   
-  # In einem letzten Schritt lassen wir uns nun noch die 5 nÃÂ¤chsten Nachbarn,
-  # basierend auf der ÃÂhnlichkeit der Buchtitel ausgeben
+  # In einem letzten Schritt lassen wir uns nun noch die 5 nÃÂÃÂ¤chsten Nachbarn,
+  # basierend auf der ÃÂÃÂhnlichkeit der Buchtitel ausgeben
   
   top5Recc <- sort(CosineTitel[as.character(allTitles[1, ]$doc_id),], decreasing = TRUE)
   top5Recc <- top5Recc[names(top5Recc) != as.character(allTitles[1, ]$doc_id)]#[1:5]
   # topRecc <- top5Recc[top5Recc != 0]
-  # hier kann man ÃÂ¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
+  # hier kann man ÃÂÃÂ¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
   topRecc <- top5Recc[top5Recc >= simThresh]
   topRecc <- normalize(topRecc)
@@ -452,13 +432,13 @@ UniteTopics_Recommendations <- function(activeItem, simThresh = 0.3) {
   parallelStop()
   toc()
   
-  # In einem letzten Schritt lassen wir uns nun noch die 5 nÃÂ¤chsten Nachbarn,
-  # basierend auf der ÃÂhnlichkeit der Buchtitel ausgeben
+  # In einem letzten Schritt lassen wir uns nun noch die 5 nÃÂÃÂ¤chsten Nachbarn,
+  # basierend auf der ÃÂÃÂhnlichkeit der Buchtitel ausgeben
   
   top5Recc <- sort(kNNCosine[as.character(allTitles[1, ]$itemID),], decreasing = TRUE)
   top5Recc <- top5Recc[names(top5Recc) != as.character(allTitles[1, ]$itemID)]#[1:5]
   # topRecc <- top5Recc[top5Recc != 0]
-  # hier kann man ÃÂ¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
+  # hier kann man ÃÂÃÂ¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
   topRecc <- top5Recc[top5Recc >= simThresh] # 0.5 teilweise schon zu aggressiv
   topRecc <- normalize(topRecc)
@@ -515,16 +495,16 @@ Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBask
 }
 
 ### Test der Funktion
-# Recommendation_function_inDupSes(17) # test für 'the hobbit'
+# Recommendation_function_inDupSes(17) # test fÃ¼r 'the hobbit'
 
 ##Recommendation Function schlechter Fall
-Notausgang_funktion <- function(activeItem = 100){
+Notausgang_funktion <- function(activeItem){
   
   activeItemID <- activeAuthorAndTitel$itemID[activeItem] # hier loopen
   activeItemID
   
   selected_features <- totalInfo %>% filter(itemID==activeItemID) %>%
-    select(itemID,author,mainTopic,publisher)    #nehmen von OR_tbl ausgewÃ¤hlte Spalten
+    select(itemID,author,mainTopic,publisher)    #nehmen von OR_tbl ausgewÃÂ¤hlte Spalten
   
   this_author <- selected_features$author         #als chr darstellen 
   
@@ -534,33 +514,10 @@ Notausgang_funktion <- function(activeItem = 100){
   
   items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
   
-  #set.seed(123)
-  top_seller_by_mainTopic <- joined_oR %>%
-    select(itemID, order, title, author, publisher, mainTopic) %>%
-    filter(order >= 1) %>%
-    group_by(mainTopic, itemID) %>%
-    summarise(
-      title = title,
-      author = author,
-      sumOrders = sum(order, na.rm=T),
-      N = n(),
-      .groups = "keep"
-    ) %>%
-    distinct(.keep_all = T)
+  set.seed(123)
+  nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
   
-  nimm_5 <- top_seller_by_mainTopic %>%
-    filter(mainTopic == this_genre) %>%
-    arrange(desc(sumOrders)) %>%
-    head(n=5)
-  
-  if (length(nimm_5) < 5) {
-    values_left <- 5 - length(nimm_5)
-    nimm_5 <- nimm_5 + slice_sample(items_select[!items_select$itemID %in% nimm_5], n=values_left)
-  }
-  
-  #nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
-  
-  nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random BÃ¼cher mit dem gleichen (Publisher oder author) und mainTopic
+  nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random BÃÂ¼cher mit dem gleichen (Publisher oder author) und mainTopic
   
   return(nimm_5)
 }
@@ -569,25 +526,25 @@ Notausgang_funktion <- function(activeItem = 100){
 # Notausgang_funktion(999)
 
 ##Struktur von finalen Funktion
-# activeItem <- 35 # 4 für Fall 1, 25 für Fall 2, 2 für Fall 3, 23 für Fall 4
+# activeItem <- 4 # 4 fÃ¼r Fall 1, 25 fÃ¼r Fall 2, 2 fÃ¼r Fall 3, 23 fÃ¼r Fall 4
 # 
 # weightTM = 0.33
 # weightUT = 0.33
 # weightDupSes = 0.34
 # 
 # weightClicks = 0.2
-# weightBasekt = 0.3
+# weightBasket = 0.3
 # weightOrder = 0.5
-# 
+
 # rm(activeItem, weightTM, weightUT, weightDupSes, weightClicks, weightBasekt, weightOrder)
 
 HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, weightDupSes = 1/3, 
                                  weightClicks = 0.2, weightBasket = 0.3, weightOrder = 0.5){
   
-  # Frage: soll ich dann, in den Fällen ab Fall 1 die Gewichtungen auf einen Wert von 1 skalieren,
+  # Frage: soll ich dann, in den FÃ¤llen ab Fall 1 die Gewichtungen auf einen Wert von 1 skalieren,
   # sodass bspw. weightTM und weightUT als 0.5 dargestellt werden?
   # Hab ich jetzt mal gemacht - mehr oder weniger
-
+  
   activeItemID <- activeAuthorAndTitel$itemID[activeItem]
   
   activeItemInfo <- totalInfo %>% filter(itemID==activeItemID)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
@@ -617,45 +574,34 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     RecomMatEqu3 <- cbind(result_TM[names(equal3)], result_UT[names(equal3)], result_inDupSes[names(equal3)])
     rownames(RecomMatEqu3) <- names(equal3) 
     
-    finalRecom <- RecomMatEqu3 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
-    finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
+    finalRecomEqu3 <- RecomMatEqu3 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
+    #finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
     
-    if (length(finalRecom) < 5){
+    equal2 <- which(finalTable == 2)
       
-      values_left <- 5 - length(finalRecom)
+    resultequal2 <- finalTable[equal2]
       
-      equal2 <- which(finalTable == 2)
+    RecomMatEqu2 <- cbind(result_TM[names(equal2)], result_UT[names(equal2)], result_inDupSes[names(equal2)])
+    rownames(RecomMatEqu2) <- names(equal2) 
       
-      resultequal2 <- finalTable[equal2]
-      
-      RecomMatEqu2 <- cbind(result_TM[names(equal2)], result_UT[names(equal2)], result_inDupSes[names(equal2)])
-      rownames(RecomMatEqu2) <- names(equal2) 
-      
-      finalRecom2 <- RecomMatEqu2 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
-      finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
-      
-      finalRecom <- c(finalRecom , finalRecom2)
-      
-    }
+    finalRecomEqu2 <- RecomMatEqu2 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
+    #finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
     
-    if (length(finalRecom) < 5){
+    equal1 <- which(finalTable == 1)
       
-      values_left <- 5 - length(finalRecom)
+    resultequal1 <- finalTable[equal1]
       
-      equal1 <- which(finalTable == 1)
+    RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)], result_inDupSes[names(equal1)])
+    rownames(RecomMatEqu1) <- names(equal1) 
       
-      resultequal1 <- finalTable[equal1]
+    finalRecomEqu1 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
+    #finalRecom3 <- finalRecom3 %>% sort(decreasing = T) %>% head(values_left)
       
-      RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)], result_inDupSes[names(equal1)])
-      rownames(RecomMatEqu1) <- names(equal1) 
-      
-      finalRecom3 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
-      finalRecom3 <- finalRecom3 %>% sort(decreasing = T) %>% head(values_left)
-      
-      finalRecom <- c(finalRecom, finalRecom3)
-      
-    }
+    allRecom <- c(finalRecomEqu3, finalRecomEqu2, finalRecomEqu1)
+    allRecom <- sort(allRecom, decreasing = TRUE)
     
+    finalRecom <- head(allRecom, 5)
+      
   }
   
   #Fall_2: Subtopic + inDupSes .   kein Klappentext == NA 
@@ -673,30 +619,26 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     
     equal2 <- which(finalTable == 2)
     
-    finalRecom <- c()
     RecomMatEqu2 <- cbind(result_UT[names(equal2)],result_inDupSes[names(equal2)])
     rownames(RecomMatEqu2) <- names(equal2) 
     
-    finalRecom <- RecomMatEqu2 %>% rowSums(na.rm = T) / sum(weightUT, weightDupSes)
-    finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
+    finalRecomEqu2 <- RecomMatEqu2 %>% rowSums(na.rm = T) / sum(weightUT, weightDupSes)
+    #finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
     
-    if (length(finalRecom) < 5){
+    equal1 <- which(finalTable == 1)
       
-      values_left <- 5 - length(finalRecom)
+    resultequal1 <- finalTable[equal1]
       
-      equal1 <- which(finalTable == 1)
+    RecomMatEqu1 <- cbind(result_UT[names(equal1)], result_inDupSes[names(equal1)])
+    rownames(RecomMatEqu1) <- names(equal1) 
       
-      resultequal1 <- finalTable[equal1]
-      
-      RecomMatEqu1 <- cbind(result_UT[names(equal1)], result_inDupSes[names(equal1)])
-      rownames(RecomMatEqu1) <- names(equal1) 
-      
-      finalRecom2 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightUT, weightDupSes)
-      finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
-      
-      finalRecom <- c(finalRecom , finalRecom2)
-      
-    }
+    finalRecomEqu1 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightUT, weightDupSes)
+    #finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
+    
+    allRecom <- c(finalRecomEqu2, finalRecomEqu1)
+    allRecom <- sort(allRecom, decreasing = TRUE)
+    
+    finalRecom <- head(allRecom, 5)
     
   }
   
@@ -715,30 +657,26 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     
     equal2 <- which(finalTable == 2)
     
-    finalRecom <- c()
     RecomMatEqu2 <- cbind(result_TM[names(equal2)], result_UT[names(equal2)])
     rownames(RecomMatEqu2) <- names(equal2) 
     
-    finalRecom <- RecomMatEqu2 %>% rowSums(na.rm = T) / sum(weightTM, weightUT)
-    finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
+    finalRecomEqu2 <- RecomMatEqu2 %>% rowSums(na.rm = T) / sum(weightTM, weightUT)
+    #finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
     
-    if (length(finalRecom) < 5){
+    equal1 <- which(finalTable == 1)
       
-      values_left <- 5 - length(finalRecom)
+    resultequal1 <- finalTable[equal1]
       
-      equal1 <- which(finalTable == 1)
+    RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)])
+    rownames(RecomMatEqu1) <- names(equal1) 
       
-      resultequal1 <- finalTable[equal1]
+    finalRecomEqu1 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightTM, weightUT)
+    #finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
       
-      RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)])
-      rownames(RecomMatEqu1) <- names(equal1) 
-      
-      finalRecom2 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightTM, weightUT)
-      finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
-      
-      finalRecom <- c(finalRecom , finalRecom2)
-      
-    }
+    allRecom <- c(finalRecomEqu2, finalRecomEqu1)
+    allRecom <- sort(allRecom, decreasing = TRUE)
+    
+    finalRecom <- head(allRecom, 5)
     
   }
   
@@ -754,11 +692,15 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     
     equal1 <- which(finalTable == 1)
     
-    finalRecom <- c()
     RecomMatEqu1 <- cbind(result_UT[names(equal1)])
     rownames(RecomMatEqu1) <- names(equal1)
     
-    finalRecom <- RecomMatEqu1 %>% rowSums(na.rm = T) %>% sort(decreasing = T) %>% head(5)
+    finalRecomEqu1 <- RecomMatEqu1 %>% rowSums(na.rm = T)
+    
+    allRecom <- finalRecomEqu1
+    allRecom <- sort(allRecom, decreasing = TRUE)
+    
+    finalRecom <- head(allRecom, 5)
     
     if (length(finalRecom) < 5){
       
@@ -768,9 +710,9 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
       Notausgang <- as.character(Notausgang)[1:values_left]
       valuesNotausgang <- rep(0.000000, values_left)
       names(valuesNotausgang) <- Notausgang
-      finalRecom2 <- valuesNotausgang[1:values_left]
+      finalRecomNotausgang <- valuesNotausgang[1:values_left]
       
-      finalRecom <- c(finalRecom, finalRecom2)
+      finalRecom <- c(finalRecom, finalRecomNotausgang)
       
     }
     
@@ -782,28 +724,33 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
 }
 
 # ### Test HybridRecommendation
-# tic("Start Hybrid Recommendation")
-# HybridRecommendation(activeItem = 35) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
-# toc()
+tic("Start Hybrid Recommendation")
+HybridRecommendation(activeItem = 35) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
+toc()
 
 # FRAGE: Was passiert, wenn wir 5+ Items haben, mit einer Similarity von 1?
 # Ist insbesondere im letzten Fall realistisch
 
-forItems <- 200
+forItems <- 100
 
 Recommendations <- matrix(NA, ncol = 5, nrow = forItems)
 
-itemIDs <- activeAuthorAndTitel$itemID[100:forItems]
+itemIDs <- activeAuthorAndTitel$itemID[1:forItems]
 
 tic("Start Recommendations")
-for(idx in 100:forItems){
-
+for(idx in 1:forItems){
+  
   ReccItems <- HybridRecommendation(activeItem = idx)
   Recommendations[idx,] <- names(ReccItems)
-
-  print(paste("just finished item ", idx, sep = " "))
+  
   print(Recommendations[idx,])
+  print(paste("just finished item:", idx, sep = " "))
+  
 }
 rownames(Recommendations) <- as.character(itemIDs)
 Recommendations
 toc()
+
+# write.csv(Recommendations, "Recommendations.csv")
+# 
+# top100 <- read.csv("Recommendations.csv")
