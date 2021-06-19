@@ -3,7 +3,7 @@
 # Working Directory Definieren
 
 getwd()
-setwd("C:/Users/Rolf/Desktop/WFI - Unterlagen/Master/4. Semester/Data Analytics Challenge/Data_Analytics_Challenge")
+setwd("/home/rstudio/Data_Analytics_Challenge")
 
 # Packages installieren
 
@@ -23,40 +23,23 @@ library(parallelMap)
 library(parallel)
 library(proxyC)
 library(tm)
+library(xml2)
+library(dplyr)
+library(tidyr)
 
 ### DatensÃÂ¤tze laden
 
 # Datensatz mit Item-Informationen
-items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
-  itemID=col_integer(),
-  title=col_character(),
-  author=col_character(),
-  publisher=col_character(),
-  mainTopic=col_character(),
-  uniteTopics=col_character()
-))
-head(items, n=20)
-glimpse(items)
+items6 <- read.csv("./Data/items6.csv", encoding = "UTF-8")
 
 # Datensatz mit Transaktionsdaten
-transactions <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
-  sessionID = col_integer(),
-  itemID = col_integer(),
-  click = col_integer(),
-  basket = col_integer(),
-  order = col_integer()
-))
+transactions <- dplyr::as_tibble(read.csv("./Data/transactions.csv", header = T, sep = "|", quote = "", row.names = NULL, stringsAsFactors = F))
+
 # Crawler-Daten mit Klappentexten
-FCD_tibble <- read_csv(file="./Data/KlappentexteUndTitel.csv", col_names=T, col_types=cols(
-     title=col_character(),
-     Beschreibung=col_character()
-))
-  
+FCD_tibble <- dplyr::as_tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
+
 # Evaluations-Daten
-evaluation <-  read.csv(file = "./Data/evaluation.csv", header = T, quote = "", row.names = NULL, stringsAsFactors = F)
-evaluation$itemID <- as.integer(evaluation$itemID)
-evaluation_tbl <- as_tibble(evaluation)
-evaluation_tbl$itemID <- as.integer(evaluation_tbl$itemID)
+evaluation <- read.csv("./Data/evaluation.csv")
 
 ### DatensÃÂ¤tze transformieren und ergÃÂ¤nzende erstellen
 
@@ -130,7 +113,7 @@ rm(itemIDs, itemMat)
 
 # ZusammenfÃÂ¼gen der Transaktions- und Item-Daten, welche als Ausgangspunkt
 # zur Gewinnung weiterer Features dienen
-joined_oR <- left_join(transactions, items, by = "itemID")
+joined_oR <- left_join(transactions, items6, by = "itemID")
 
 # Erstellung von dup.ses, um im spÃÂ¤teren Verlauf eine Art ARM anwenden zu kÃÂ¶nnen
 dup.ses <- joined_oR[joined_oR$sessionID %in%
@@ -204,7 +187,7 @@ FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
 # - titleUndBeschreibung (titel + Beschreibung)
 
 # VerknÃÂ¼pfung items6 mit itemsInTrans ÃÂ¼ber die itemID
-totalInfo <- items %>% left_join(itemsInTrans, by = "itemID")
+totalInfo <- items6 %>% left_join(itemsInTrans, by = "itemID")
 # ÃÂberschreibung der NA mit FALSE
 totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
 
@@ -235,7 +218,7 @@ totalInfo <- totalInfo %>% left_join(FCD_tibble, by = "title")
 totalInfo <- totalInfo %>% mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
 
 # Nicht mehr benÃ¶tigte DatensÃ¤tze lÃ¶schen, um Speicherplatz zu sparen
-rm(clicked, basket, ordered, inDupSes, itemsInTrans, items, transactions, FCD_tibble)
+rm(clicked, basket, ordered, inDupSes, itemsInTrans, items6, transactions, joined_oR, FCD_tibble)
 
 ### Erstellung von activeAuthorAndTitel
 
@@ -268,7 +251,7 @@ normalize <- function(x){
 
 makeDTM <- function(x) {
   
-  Corpus <- VCorpus(DataframeSource(x))
+  Corpus <- tm::Corpus(DataframeSource(x))
   
   Corpus <- Corpus %>%
     tm_map(stripWhitespace) %>%
@@ -279,7 +262,7 @@ makeDTM <- function(x) {
     tm_map(removeWords, stopwords("german")) %>%
     tm_map(removeWords, stopwords("french")) %>%
     tm_map(removeWords, stopwords("spanish")) %>% 
-    tm_map(removeWords, c("NA","Ã¢ÂÂ¢","ÃÂ»","ÃÂ®", "Ã¢ÂÂ", "ÃÂ¡", "ÃÂ¿", "Ã¢ÂÂ"))
+    tm_map(removeWords, c("NA","Ã¢ÂÂ¢","ÃÂ»","ÃÂ®", "Ã¢ÂÂ", "ÃÂ¡", "ÃÂ¿", "Ã¢ÂÂ", "à"))
   
   # Als nÃÂ¤chstes wird der Corpus in eine TF-IDF-Matrix ÃÂ¼berfÃÂ¼hrt:
   DTM <- DocumentTermMatrix(Corpus, control = list(weighting = weightTfIdf))
@@ -335,7 +318,7 @@ makeAllTitles <- function(activeItem){
     
   } else {
     
-    aA1_top10NeigbhorsCos <-  aA1_NeighorsCos[aA1_NeighorsCos >= 0.9] 
+    aA1_top10NeigbhorsCos <-  aA1_NeighorsCos[aA1_NeighorsCos == 1] 
     # fraglich, ob man hier nicht vielleicht ">= 0.9" nimmt, anstatt "== 1"
     
     aA1_top10NeigbhorsCos <- names(aA1_top10NeigbhorsCos) # nur noch deren Namen
@@ -436,7 +419,7 @@ TM_Recommendations <- function(activeItem, simThresh = 0.1){
 
 ### Definition von UniteTops_Recommendations
 
-UniteTopics_Recommendations <- function(activeItem, simThresh = 0.3) {
+UniteTopics_Recommendations <- function(activeItem, simThresh = 0.2) {
   
   allTitles <- makeAllTitles(activeItem)
   
@@ -549,7 +532,7 @@ Notausgang_funktion <- function(activeItem = 100){
     distinct(.keep_all = T)
   
   nimm_5 <- top_seller_by_mainTopic %>%
-    filter(mainTopic == this_genre) %>%
+    filter(mainTopic == this_genre & itemID != activeItemID) %>%
     arrange(desc(sumOrders)) %>%
     head(n=5)
   
@@ -578,16 +561,16 @@ Notausgang_funktion <- function(activeItem = 100){
 # weightClicks = 0.2
 # weightBasekt = 0.3
 # weightOrder = 0.5
-# 
-# rm(activeItem, weightTM, weightUT, weightDupSes, weightClicks, weightBasekt, weightOrder)
 
-HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, weightDupSes = 1/3, 
+#rm(activeItem, weightTM, weightUT, weightDupSes, weightClicks, weightBasekt, weightOrder)
+
+HybridRecommendation <- function(activeItem, weightTM = 30/100, weightUT = 40/100, weightDupSes = 30/100, 
                                  weightClicks = 0.2, weightBasket = 0.3, weightOrder = 0.5){
   
   # Frage: soll ich dann, in den Fällen ab Fall 1 die Gewichtungen auf einen Wert von 1 skalieren,
   # sodass bspw. weightTM und weightUT als 0.5 dargestellt werden?
   # Hab ich jetzt mal gemacht - mehr oder weniger
-
+  
   activeItemID <- activeAuthorAndTitel$itemID[activeItem]
   
   activeItemInfo <- totalInfo %>% filter(itemID==activeItemID)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
@@ -781,29 +764,41 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   
 }
 
-# ### Test HybridRecommendation
-# tic("Start Hybrid Recommendation")
-# HybridRecommendation(activeItem = 35) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
-# toc()
+### Test HybridRecommendation
+tic("Start Hybrid Recommendation")
+HybridRecommendation(activeItem = 35) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
+toc()
 
 # FRAGE: Was passiert, wenn wir 5+ Items haben, mit einer Similarity von 1?
 # Ist insbesondere im letzten Fall realistisch
 
-forItems <- 200
+forItems <- 100
 
 Recommendations <- matrix(NA, ncol = 5, nrow = forItems)
 
-itemIDs <- activeAuthorAndTitel$itemID[100:forItems]
+itemIDs <- activeAuthorAndTitel$itemID[1:forItems]
 
+RecommendWithErrorHandling = function(activeItem) {
+  tryCatch(HybridRecommendation(activeItem),
+           error = function(e) {
+             print(paste("Error during the recommendation for item: ", activeItem, ". Exception: ", e)); 
+             res <- c(NaN, NaN, NaN, NaN, NaN);
+             names(res) <- c(NaN, NaN, NaN, NaN, NaN);
+             return (res)
+           }
+  ) 
+}
 tic("Start Recommendations")
-for(idx in 100:forItems){
-
-  ReccItems <- HybridRecommendation(activeItem = idx)
+for(idx in 1:forItems){
+  
+  ReccItems <- RecommendWithErrorHandling(activeItem = idx)
   Recommendations[idx,] <- names(ReccItems)
-
+  
   print(paste("just finished item ", idx, sep = " "))
   print(Recommendations[idx,])
 }
 rownames(Recommendations) <- as.character(itemIDs)
 Recommendations
 toc()
+
+
