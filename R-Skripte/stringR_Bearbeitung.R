@@ -24,26 +24,27 @@ glimpse(items)
 ### utf8 encodieren
 items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"))
 ### whitespace von beiden seiten entfernen
-items[, 2:6] <- apply(items[, 2:6], MARGIN=2, FUN=function(x) str_trim(string=x,side="both"))
+items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both"))
 ### alle strings in kleinen buchstaben darstellen --> im default "english" eingestellt, allerdings mehr bücher auf deutsch im datensatz enthalten
-items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_to_lower(string=x, locale="de"))
+items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_to_lower(string=x, locale="de"))
 ### komische sonderzeichen ersetzen durch "" 
-items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""))
+items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""))
 head(items, n=20)
 
 ### subTopics separat von sonderzeichen befreien
-#items$subtopics <- gsub("\\[|\\]", "", items$subtopics, perl=T)
+items$subtopics <- gsub("\\[|\\]", "", items$subtopics, perl=T)
 ## kommas müssen extra angezielt werden zur entfernung
-#items$subtopics <- gsub(","," ",items$subtopics)
-#head(items, n=20)
+items$subtopics <- gsub(","," ",items$subtopics)
+head(items, n=20)
 
 ### mainTopics und subTopics zusammenführen und subtopics als einzelne variable entfernen
 items <- items %>%
-  mutate(uniteTopics = paste(main.topic, subtopics, sep =  "")) %>% 
+  mutate(uniteTopics = paste(main.topic, subtopics, sep =  " ")) %>% 
   select(-subtopics)
 head(items, n=20)
 ### funktion definieren, um dopplungen aus maintopics und subtopics in kommender variable 'uniteTopics' zu entfernen
 rem_dup_word <- function(x) {
+  x <- tolower(x)
   paste(unique(trimws(unlist(strsplit(x, split=" ", fixed=F, perl=T) ), which="both" ) ), collapse= " " )
 }
 
@@ -55,7 +56,9 @@ items_bearb <- items_bearb %>%
   mutate(
     newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F))) %>%
   select(-uniteTopics) %>%
-  rename(uniteTopics = newTopics, mainTopic = main.topic)
+  rename(uniteTopics = newTopics, mainTopic = main.topic) %>%
+  mutate(
+    mainTopic = tolower(mainTopic))
 head(items_bearb, n=20)
 str(items_bearb)
 

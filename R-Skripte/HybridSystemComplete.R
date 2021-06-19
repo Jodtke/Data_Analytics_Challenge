@@ -24,36 +24,39 @@ library(parallel)
 library(proxyC)
 library(tm)
 
-
 ### DatensÃÂ¤tze laden
 
 # Datensatz mit Item-Informationen
 items <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
-  itemID=col_factor(),
-  title=col_factor(),
-  author=col_factor(),
-  publisher=col_factor(),
-  main.topic=col_factor(),
-  subtopics=col_character()
+  itemID=col_integer(),
+  title=col_character(),
+  author=col_character(),
+  publisher=col_character(),
+  mainTopic=col_character(),
+  uniteTopics=col_character()
 ))
 head(items, n=20)
 glimpse(items)
 
 # Datensatz mit Transaktionsdaten
 transactions <- read_delim(file="./Data/transactions.csv", col_names=T, delim="|", col_types=cols(
-  sessionID = col_factor(),
-  itemID = col_factor(),
+  sessionID = col_integer(),
+  itemID = col_integer(),
   click = col_integer(),
   basket = col_integer(),
   order = col_integer()
 ))
 # Crawler-Daten mit Klappentexten
-FCD_tibble <- as_tibble(read.csv("./Data/KlappentexteUndTitel.csv", encoding = "UTF-8"))
-
+FCD_tibble <- read_csv(file="./Data/KlappentexteUndTitel.csv", col_names=T, col_types=cols(
+     title=col_character(),
+     Beschreibung=col_character()
+))
+  
 # Evaluations-Daten
 evaluation <-  read.csv(file = "./Data/evaluation.csv", header = T, quote = "", row.names = NULL, stringsAsFactors = F)
+evaluation$itemID <- as.integer(evaluation$itemID)
 evaluation_tbl <- as_tibble(evaluation)
-evaluation_tbl$itemID <- as.factor(evaluation_tbl$itemID)
+evaluation_tbl$itemID <- as.integer(evaluation_tbl$itemID)
 
 ### DatensÃÂ¤tze transformieren und ergÃÂ¤nzende erstellen
 
@@ -200,7 +203,7 @@ FCD_tibble <- FCD_tibble %>% distinct(title, .keep_all = TRUE)
 # - Beschreibung
 # - titleUndBeschreibung (titel + Beschreibung)
 
-# VerknÃÂ¼pfung items7 mit itemsInTrans ÃÂ¼ber die itemID
+# VerknÃÂ¼pfung items6 mit itemsInTrans ÃÂ¼ber die itemID
 totalInfo <- items %>% left_join(itemsInTrans, by = "itemID")
 # ÃÂberschreibung der NA mit FALSE
 totalInfo$inTransactions[is.na(totalInfo$inTransactions)] <- FALSE
@@ -269,7 +272,7 @@ makeDTM <- function(x) {
   
   Corpus <- Corpus %>%
     tm_map(stripWhitespace) %>%
-    tm_map(removeNumbers) %>% # ist das sinnvoll?
+    #tm_map(removeNumbers) %>% # ist das sinnvoll?
     tm_map(removePunctuation) %>%
     tm_map(content_transformer(tolower)) %>%
     tm_map(removeWords, stopwords("english")) %>% 
@@ -394,7 +397,7 @@ makeAllTitles <- function(activeItem){
 # weiteren Verlauf den anderen Komponenten dieses hybriden Systems gegenÃÂ¼ber
 # gestellt.
 
-TM_Recommendations <- function(activeItem){
+TM_Recommendations <- function(activeItem, simThresh = 0.1){
   
   allTitles <- makeAllTitles(activeItem)
   
@@ -421,9 +424,10 @@ TM_Recommendations <- function(activeItem){
   
   top5Recc <- sort(CosineTitel[as.character(allTitles[1, ]$doc_id),], decreasing = TRUE)
   top5Recc <- top5Recc[names(top5Recc) != as.character(allTitles[1, ]$doc_id)]#[1:5]
-  topRecc <- top5Recc[top5Recc != 0]
+  # topRecc <- top5Recc[top5Recc != 0]
   # hier kann man ÃÂ¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
+  topRecc <- top5Recc[top5Recc >= simThresh]
   topRecc <- normalize(topRecc)
   #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
   return(topRecc)
@@ -432,7 +436,7 @@ TM_Recommendations <- function(activeItem){
 
 ### Definition von UniteTops_Recommendations
 
-UniteTopics_Recommendations <- function(activeItem) {
+UniteTopics_Recommendations <- function(activeItem, simThresh = 0.3) {
   
   allTitles <- makeAllTitles(activeItem)
   
@@ -453,9 +457,10 @@ UniteTopics_Recommendations <- function(activeItem) {
   
   top5Recc <- sort(kNNCosine[as.character(allTitles[1, ]$itemID),], decreasing = TRUE)
   top5Recc <- top5Recc[names(top5Recc) != as.character(allTitles[1, ]$itemID)]#[1:5]
-  topRecc <- top5Recc[top5Recc != 0]
+  # topRecc <- top5Recc[top5Recc != 0]
   # hier kann man ÃÂ¼berlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
+  topRecc <- top5Recc[top5Recc >= simThresh] # 0.5 teilweise schon zu aggressiv
   topRecc <- normalize(topRecc)
   #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
   return(topRecc)
@@ -476,7 +481,7 @@ UniteTopics_Recommendations <- function(activeItem) {
 
 #Recommendation Function based on sessionID
 
-Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBasekt, weightOrder){
+Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBasket, weightOrder){
   
   activeItemID <- activeAuthorAndTitel$itemID[activeItem] # hier loopen
   activeItemID
@@ -489,11 +494,11 @@ Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBase
   this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID) 
   
   potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItemID)%>% 
-    summarise(nClick=sum(click),nBasket=sum(basket),norder=sum(order)) %>%
+    summarise(nClick=sum(click),nBasket=sum(basket),nOrder=sum(order)) %>%
     arrange(desc(nClick))
   
   potential_recommendations <- potential_recommendations %>% 
-    mutate(kennzahl = (nClick*weightClicks + nBasket*weightBasekt + norder*weightOrder)/sum(weightClicks,weightBasekt,weightOrder))
+    mutate(kennzahl = (nClick*weightClicks + nBasket*weightBasket + nOrder*weightOrder)/sum(weightClicks,weightBasket,weightOrder))
   
   potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
     filter(itemID != activeItemID) #%>% slice_max(kennzahl,n=10)  
@@ -529,7 +534,7 @@ Notausgang_funktion <- function(activeItem){
   
   items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
   
-  set.seet(123)
+  set.seed(123)
   nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
   
   nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random BÃ¼cher mit dem gleichen (Publisher oder author) und mainTopic
@@ -541,7 +546,7 @@ Notausgang_funktion <- function(activeItem){
 # Notausgang_funktion(999)
 
 ##Struktur von finalen Funktion
-# activeItem <- 9 # 4 für Fall 1, 25 für Fall 2, 2 für Fall 3, 23 für Fall 4
+# activeItem <- 35 # 4 für Fall 1, 25 für Fall 2, 2 für Fall 3, 23 für Fall 4
 # 
 # weightTM = 0.33
 # weightUT = 0.33
@@ -550,9 +555,11 @@ Notausgang_funktion <- function(activeItem){
 # weightClicks = 0.2
 # weightBasekt = 0.3
 # weightOrder = 0.5
+# 
+# rm(activeItem, weightTM, weightUT, weightDupSes, weightClicks, weightBasekt, weightOrder)
 
-HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, weightDupSes = 0.34, 
-                                 weightClicks = 0.2, weightBasekt = 0.3, weightOrder = 0.5){
+HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, weightDupSes = 1/3, 
+                                 weightClicks = 0.2, weightBasket = 0.3, weightOrder = 0.5){
   
   # Frage: soll ich dann, in den Fällen ab Fall 1 die Gewichtungen auf einen Wert von 1 skalieren,
   # sodass bspw. weightTM und weightUT als 0.5 dargestellt werden?
@@ -575,7 +582,7 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
     result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
     itemsFromUT <- names(result_UT)
     
-    result_inDupSes <- Recommendation_function_inDupSes(activeItem, weightClicks, weightBasekt, weightOrder) * weightDupSes
+    result_inDupSes <- Recommendation_function_inDupSes(activeItem, weightClicks, weightBasket, weightOrder) * weightDupSes
     itemsFromDupSes <- names(result_inDupSes)
     
     all_potential_recom <- c(itemsFromTM, itemsFromUT,itemsFromDupSes)
@@ -584,12 +591,11 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
     
     equal3 <- which(finalTable == 3)
     
-    finalRecom <- c()
     RecomMatEqu3 <- cbind(result_TM[names(equal3)], result_UT[names(equal3)], result_inDupSes[names(equal3)])
     rownames(RecomMatEqu3) <- names(equal3) 
     
     finalRecom <- RecomMatEqu3 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
-    finalRecom < finalRecom %>% sort(decreasing = T) %>% head(5)
+    finalRecom <- finalRecom %>% sort(decreasing = T) %>% head(5)
     
     if (length(finalRecom) < 5){
       
@@ -618,12 +624,12 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
       resultequal1 <- finalTable[equal1]
       
       RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)], result_inDupSes[names(equal1)])
-      rownames(RecomMatEqu1) <- names(RecomMatEqu1) 
+      rownames(RecomMatEqu1) <- names(equal1) 
       
       finalRecom3 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightTM, weightUT, weightDupSes)
       finalRecom3 <- finalRecom3 %>% sort(decreasing = T) %>% head(values_left)
       
-      finalRecom <- c(finalRecom , finalRecom2, finalRecom3)
+      finalRecom <- c(finalRecom, finalRecom3)
       
     }
     
@@ -635,7 +641,7 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
     result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
     itemsFromUT <- names(result_UT)
     
-    result_inDupSes <- Recommendation_function_inDupSes(activeItem) * weightDupSes
+    result_inDupSes <- Recommendation_function_inDupSes(activeItem, weightClicks, weightBasket, weightOrder) * weightDupSes
     itemsFromDupSes <- names(result_inDupSes)
     
     all_potential_recom <- c(itemsFromUT,itemsFromDupSes)
@@ -736,7 +742,10 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
       values_left <- 5 - length(finalRecom)
       
       Notausgang <- Notausgang_funktion(activeItem)
-      finalRecom2 <- Notausgang[1:values_left]
+      Notausgang <- as.character(Notausgang)[1:values_left]
+      valuesNotausgang <- rep(0.000000, values_left)
+      names(valuesNotausgang) <- Notausgang
+      finalRecom2 <- valuesNotausgang[1:values_left]
       
       finalRecom <- c(finalRecom, finalRecom2)
       
@@ -749,11 +758,29 @@ HybridRecommendation <- function(activeItem, weightTM = 0.33, weightUT = 0.33, w
   
 }
 
-### Test HybridRecommendation
-tic("Start Hybrid Recommendation")
-HybridRecommendation(187)
-toc()
+# ### Test HybridRecommendation
+# tic("Start Hybrid Recommendation")
+# HybridRecommendation(activeItem = 35) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
+# toc()
 
 # FRAGE: Was passiert, wenn wir 5+ Items haben, mit einer Similarity von 1?
 # Ist insbesondere im letzten Fall realistisch
 
+forItems <- 100
+
+Recommendations <- matrix(NA, ncol = 5, nrow = forItems)
+
+itemIDs <- activeAuthorAndTitel$itemID[1:forItems]
+
+tic("Start Recommendations")
+for(idx in 36:forItems){
+
+  ReccItems <- HybridRecommendation(activeItem = idx)
+  Recommendations[idx,] <- names(ReccItems)
+
+  print(paste("just finished item ", idx, sep = " "))
+  print(Recommendations[idx,])
+}
+rownames(Recommendations) <- as.character(itemIDs)
+Recommendations
+toc()
