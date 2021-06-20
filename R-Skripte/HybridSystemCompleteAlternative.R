@@ -215,7 +215,7 @@ totalInfo <- totalInfo %>% left_join(FCD_tibble, by = "title")
 totalInfo <- totalInfo %>% mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
 
 # Nicht mehr benÃÂ¶tigte DatensÃÂ¤tze lÃÂ¶schen, um Speicherplatz zu sparen
-rm(clicked, basket, ordered, inDupSes, itemsInTrans, items6, transactions, joined_oR, FCD_tibble)
+rm(clicked, basket, ordered, inDupSes, itemsInTrans, items6, transactions, FCD_tibble)
 
 ### Erstellung von activeAuthorAndTitel
 
@@ -514,19 +514,51 @@ Notausgang_funktion <- function(activeItem){
   
   items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
   
-  set.seed(123)
-  nimm_5 <- sample_n(items_select, 5)              #nicht sicher, ob es ne gute Idee ist, die Zeile
+  #set.seed(123)
+  top_seller_by_mainTopic <- joined_oR %>%
+    select(itemID, order, title, author, publisher, mainTopic) %>%
+    filter(order >= 1) %>%
+    group_by(mainTopic, itemID) %>%
+    summarise(
+      title = title,
+      author = author,
+      sumOrders = sum(order, na.rm=T),
+      N = n(),
+      .groups = "keep"
+    ) %>%
+    distinct(.keep_all = T)
   
-  nimm_5 <- nimm_5$itemID   #nimmt einfach 5 random BÃÂ¼cher mit dem gleichen (Publisher oder author) und mainTopic
+  nimm_5 <- top_seller_by_mainTopic %>%
+    filter(mainTopic == this_genre & itemID != activeItemID) %>%
+    arrange(desc(sumOrders)) %>%
+    head(n=5)
+  
+  nimm_5 <- nimm_5$itemID
+  
+  if (length(nimm_5) < 5) {
+    
+    values_left <- 5 - length(nimm_5)
+    
+    nimmRandom <- items_select %>% filter(itemID %in% items_select$itemID[!items_select$itemID %in% nimm_5])
+    
+    set.seed(123)
+    nimmRandom <- slice_sample(nimmRandom, n = values_left)
+    nimmRandom <- nimmRandom$itemID
+    
+    nimm_5 <- c(nimm_5, nimmRandom)
+    #nimm_5 <- topSellers + slice_sample(items_select[!items_select$itemID %in% nimm_5], n=values_left)
+  }
   
   return(nimm_5)
+  
 }
+
 
 ### Test der Funktion
 # Notausgang_funktion(999)
 
-##Struktur von finalen Funktion
-# activeItem <- 4 # 4 fÃ¼r Fall 1, 25 fÃ¼r Fall 2, 2 fÃ¼r Fall 3, 23 fÃ¼r Fall 4
+#Struktur von finalen Funktion
+# activeItem <- 23 # 4 fÃ¼r Fall 1, 25 fÃ¼r Fall 2, 2 fÃ¼r Fall 3, 23 fÃ¼r Fall 4
 # 
 # weightTM = 0.33
 # weightUT = 0.33
@@ -535,7 +567,7 @@ Notausgang_funktion <- function(activeItem){
 # weightClicks = 0.2
 # weightBasket = 0.3
 # weightOrder = 0.5
-
+# 
 # rm(activeItem, weightTM, weightUT, weightDupSes, weightClicks, weightBasekt, weightOrder)
 
 HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, weightDupSes = 1/3, 
@@ -579,8 +611,6 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     
     equal2 <- which(finalTable == 2)
       
-    resultequal2 <- finalTable[equal2]
-      
     RecomMatEqu2 <- cbind(result_TM[names(equal2)], result_UT[names(equal2)], result_inDupSes[names(equal2)])
     rownames(RecomMatEqu2) <- names(equal2) 
       
@@ -588,8 +618,6 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     #finalRecom2 <- finalRecom2 %>% sort(decreasing = T) %>% head(values_left)
     
     equal1 <- which(finalTable == 1)
-      
-    resultequal1 <- finalTable[equal1]
       
     RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)], result_inDupSes[names(equal1)])
     rownames(RecomMatEqu1) <- names(equal1) 
@@ -627,8 +655,6 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     
     equal1 <- which(finalTable == 1)
       
-    resultequal1 <- finalTable[equal1]
-      
     RecomMatEqu1 <- cbind(result_UT[names(equal1)], result_inDupSes[names(equal1)])
     rownames(RecomMatEqu1) <- names(equal1) 
       
@@ -665,8 +691,6 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     
     equal1 <- which(finalTable == 1)
       
-    resultequal1 <- finalTable[equal1]
-      
     RecomMatEqu1 <- cbind(result_TM[names(equal1)], result_UT[names(equal1)])
     rownames(RecomMatEqu1) <- names(equal1) 
       
@@ -683,7 +707,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   #Fall_4: Nur Subtopic Simularity, kein KT, nicht in Dup.ses.   #Obwohl ich bin mir nicht sicher, ob dieser Fall kommt oder soll gleich NOTAUSGANGFUNKTION angeschaltet werden
   if (hasSubtopics == TRUE & hasKlappentext == FALSE & activeItemInfo$inDupSes == FALSE){
     
-    result_UT <- UniteTopics_Recommendations(activeItem)
+    result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
     itemsFromUT <- names(result_UT)
     
     all_potential_recom <- itemsFromUT
@@ -695,7 +719,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
     RecomMatEqu1 <- cbind(result_UT[names(equal1)])
     rownames(RecomMatEqu1) <- names(equal1)
     
-    finalRecomEqu1 <- RecomMatEqu1 %>% rowSums(na.rm = T)
+    finalRecomEqu1 <- RecomMatEqu1 %>% rowSums(na.rm = T) / sum(weightUT)
     
     allRecom <- finalRecomEqu1
     allRecom <- sort(allRecom, decreasing = TRUE)
@@ -725,7 +749,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
 
 # ### Test HybridRecommendation
 tic("Start Hybrid Recommendation")
-HybridRecommendation(activeItem = 35) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
+HybridRecommendation(activeItem = 257) # weightTM = 0.1, weightUT = 0.2, weightDupSes = 0.7)
 toc()
 
 # FRAGE: Was passiert, wenn wir 5+ Items haben, mit einer Similarity von 1?
