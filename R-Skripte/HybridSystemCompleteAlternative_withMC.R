@@ -546,7 +546,6 @@ Notausgang_funktion <- function(activeItem){
     nimmRandom <- nimmRandom$itemID
     
     nimm_5 <- c(nimm_5, nimmRandom)
-    #nimm_5 <- topSellers + slice_sample(items_select[!items_select$itemID %in% nimm_5], n=values_left)
   }
   
   return(nimm_5)
@@ -585,7 +584,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   
   hasKlappentext <- !activeItemInfo %>% select(Beschreibung) %>% is.na()
   
-  #Fall_1: Subtopic + Klappentext + inDupSes =alle sind True
+  #Fall_1: Subtopic + Klappentext + inDupSes = alle sind True
   if (hasSubtopics == TRUE & hasKlappentext == TRUE & activeItemInfo$inDupSes == TRUE){
     
     result_TM <- TM_Recommendations(activeItem) * weightTM
