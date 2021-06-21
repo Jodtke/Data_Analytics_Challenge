@@ -1,14 +1,23 @@
-########### Erstellung Items6 mit strinR Package für Item-Tokenization & Word-Mining #########
+########### Erstellung Items-Datensatz mit entscheidenden Variablen für Berechnungen und Gewichtungen ##########
+########### sowie der Sparse-Matrizes der Author-Topic-Similarities sowie der Item-Topic-Similarities ##########
 
-### wichtige libraries
+### notwendige Libraries installieren
+# install.packages("tidyverse")
+# install.packages("proxyC")
+# install.packages("Matrix")
+# install.packages("parallel")
+# install.packages("parallelMap")
+# install.packages("tictoc")
+
+### Libraries laden
 library(tidyverse) ### wird grundsätzlich eingeladen
-library(tictoc) ### zeitmessungen für berechnungen
-library(parallel) ### parallele benutzung aller verfügbaren kerne auf laptop
+library(tictoc) ### Zeitmessungen für Berechnungen
+library(parallel) ### parallele Benutzung aller verfügbaren Kerne auf Laptop
 library(parallelMap) ### siehe parallel
-library(proxyC) ### berechnung der cosine similarities
-library(Matrix) ### abspeichern in speziellem Harwell-Boeing-Format für matrizen
+library(proxyC) ### Berechnung der Cosine-Similarities
+library(Matrix) ### abspeichern in speziellem Harwell-Boeing-Format für Matrizen
 
-### items daten einlesen
+### Items-Daten einlesen
 items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
@@ -20,54 +29,58 @@ items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
 head(items, n=20)
 glimpse(items)
 
-### erstes aufräumen der items daten --> jeweils mit einzelner sapply() funktion, da dadurch schnellere berechnung als innerhalb der pipe-funktion
-### utf8 encodieren
-items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"))
-### whitespace von beiden seiten entfernen
-items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both"))
-### alle strings in kleinen buchstaben darstellen --> im default "english" eingestellt, allerdings mehr bücher auf deutsch im datensatz enthalten
-items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_to_lower(string=x, locale="de"))
-### komische sonderzeichen ersetzen durch "" 
-items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""))
+### erstes Aufräumen der items Daten --> jeweils mit einzelner sapply() Funktion, da schnellere Berechnung als innerhalb einer pipe-Funktion
+## UTF8 encodieren
+items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"), USE.NAMES=F )
+## Whitespace von beiden Seiten entfernen, Topics auslassen
+items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both") )
+## alle Strings in kleinen Buchstaben darstellen --> im default "english" eingestellt, allerdings mehr Bücher auf deutsch im Datensatz enthalten, Topics auslassen
+items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_to_lower(string=x, locale="de"), USE.NAMES=F )
+## Sonderzeichen und sprachliche Eigenheiten ersetzen durch "", Topics auslassen
+items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""), USE.NAMES=F ) ### WICHTIG: Replacement muss mit Crawler-Daten übereinstimmen, sonst kein Merging möglich!!
 head(items, n=20)
 
-### subTopics separat von sonderzeichen befreien
+### subTopics separat von Sonderzeichen befreien
 items$subtopics <- gsub("\\[|\\]", "", items$subtopics, perl=T)
-## kommas müssen extra angezielt werden zur entfernung
+## Kommas müssen extra angezielt werden zur Entfernung
 items$subtopics <- gsub(","," ",items$subtopics)
 head(items, n=20)
 
-### mainTopics und subTopics zusammenführen und subtopics als einzelne variable entfernen
+### mainTopics und subTopics zusammenführen zu uniteTopics und subTopics als einzelne Variable entfernen
 items <- items %>%
-  mutate(uniteTopics = paste(main.topic, subtopics, sep =  " ")) %>% 
+  mutate(
+    uniteTopics = paste(main.topic, subtopics, sep=" ")
+    ) %>% 
   select(-subtopics)
 head(items, n=20)
-### funktion definieren, um dopplungen aus maintopics und subtopics in kommender variable 'uniteTopics' zu entfernen
+
+### Funktion definieren, um Dopplungen aus mainTopics und subTopics in uniteTopics zu entfernen
 rem_dup_word <- function(x) {
-  x <- tolower(x)
-  paste(unique(trimws(unlist(strsplit(x, split=" ", fixed=F, perl=T) ), which="both" ) ), collapse= " " )
+  x <- tolower(x) ## auch die Topics gemeinschaftlich in kleinen Buchstaben speichern
+  paste(unique(trimws(unlist(strsplit(x, split=" ", fixed=F, perl=T) ), which="both" ) ), collapse= " " ) ## von beiden Seiten Whitespace entfernen, Perl-kompatible Regular Expressions zugelassen
 }
 
-### neue variable items_bearb definieren (damit bei fehler nicht immer skript neu gestartet werden muss!)
-items_bearb <- items
-
-### oben definierte funktion mittels sapply() anwenden, die ursprünglichen namen dabei nicht extra als attribut abspeichern
-items_bearb <- items_bearb %>%
+### oben definierte Funktion mittels sapply() anwenden 
+items_bearb <- items %>% ## neue Variable items_bearb definieren, damit bei Fehler nicht immer das Skript neu gestartet werden muss 
   mutate(
-    newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F))) %>%
+    newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F) ) ## die ursprünglichen Namen dabei nicht extra als Attribut abspeichern
+    ) %>% 
   select(-uniteTopics) %>%
   rename(uniteTopics = newTopics, mainTopic = main.topic) %>%
   mutate(
-    mainTopic = tolower(mainTopic))
+    mainTopic = tolower(mainTopic)
+    )
 head(items_bearb, n=20)
 str(items_bearb)
 
+### items einfach überschreiben mit items_bearb, um Veränderungen abspeichern zu können
 items <- items_bearb
 head(items, n=20)
 rm(items_bearb, rem_dup_word)
 
-### neues csv "items7" schreiben
+### neues csv "items6" schreiben
 write_csv(items, file="./Data/items6.csv", col_names=T)
+
 ### testweise einlesen
 items2 <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
    itemID=col_factor(),
@@ -76,52 +89,58 @@ items2 <- read_csv(file="./Data/items6.csv", col_names=T, col_types=cols(
    publisher=col_character(),
    mainTopic=col_factor(),
    uniteTopics=col_factor()
- ))
- head(items2, n=20) # hat Geklappt!
+   ))
+head(items2, n=20) # hat Geklappt!
+rm(items2)
 
-################ crawler daten bearbeiten ############
-# Import der Crawler-Daten
-FCD <- readRDS("./Data/FinaleCrawlerDatenUpdated.rds")
+############################### Crawler-Daten aufbereiten ####################################
 
-# https://stackoverflow.com/questions/49564748/extract-multiple-elements-from-a-list-of-lists-lapply
-FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15))))
-# Anzahl der NAs
-sum(is.na(FCD_tibble$Beschreibung))
-# 13732 Items haben keine Klappentexte
+### Import der Crawler-Daten
+FCD <- readRDS("./Data/ersteCrawlerDaten.rds")
+
+### Listenelemente innerhalb von Listenelementen als Tibble extrahieren
+FCD_tibble <- as_tibble(do.call("rbind", lapply(FCD, '[', c(1, 15)) ) )
+
+### Anzahl der NAs
+sum(is.na(FCD_tibble$Beschreibung) ) # 14061 Items haben keine Klappentexte
 
 ### Tibble aus den Titeln und Beschreibungen der Klappentexte erstellen
 FCD_tibble <- FCD_tibble %>% 
   rename(title = Titel) %>% 
-  mutate(title = unlist(title)) %>% 
-  mutate(Beschreibung = unlist(Beschreibung))
+  mutate(
+    title = unlist(title), ## muss "entlistet" werden
+    Beschreibung = unlist(Beschreibung) ## siehe oben
+    )
 rm(FCD)
 head(FCD_tibble, n=20)
 
-### crawler daten an itemliste anpassen
+### Crawler-Daten an items anpassen, Namen nicht als Attribute übernehmen
+## UTF8 encodieren
 FCD_tibble[, 1:2] <- sapply(X=FCD_tibble[, 1:2], FUN=function(x) str_conv(string=x, encoding="UTF-8"), USE.NAMES=F)
-### whitespace von beiden seiten entfernen
-FCD_tibble[, 1:2] <- apply(X=FCD_tibble[, 1:2], MARGIN=2, FUN=function(x) str_trim(string=x, side="both"))
-### alle strings in Großbuchstaben darstellen
+## Whitespace von beiden Seiten entfernen
+FCD_tibble[, 1:2] <- apply(X=FCD_tibble[, 1:2], MARGIN=2, FUN=function(x) str_trim(string=x, side="both") )
+## alle Strings in kleinen Buchstaben darstellen
 FCD_tibble[, 1:2] <- sapply(X=FCD_tibble[, 1:2], FUN=function(x) str_to_lower(string=x, locale="de"), USE.NAMES=F) # locale="english" im default...besser als Deutsch?
-### komische sonderzeichen ersetzen durch "" 
+## Sonderzeichen ersetzen durch "" 
 FCD_tibble[, 1:2] <- sapply(X=FCD_tibble[, 1:2], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""), USE.NAMES=F)
-#items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:alnum:]]", replacement=" "))
 head(FCD_tibble, n=20)
 
 ### als eigene csv-Datei abspeichern
-#write_csv(FCD_tibble, file="./Data/KlappentexteUndTitel.csv", col_names=T)
+write_csv(FCD_tibble, file="./Data/KlappentexteUndTitel.csv", col_names=T)
+
 ### testweise einlesen
-# FCD_tibble2 <- read_csv(file="./Data/KlappentexteUndTitel.csv", col_names=T, col_types=cols(
-#    title=col_character(),
-#    Beschreibung=col_character()
-# ))
-# head(FCD_tibble2, n=20) # hat Geklappt!
+ FCD_tibble2 <- read_csv(file="./Data/KlappentexteUndTitel.csv", col_names=T, col_types=cols(
+    title=col_character(),
+    Beschreibung=col_character()
+    ))
+head(FCD_tibble2, n=20) # hat Geklappt!
+rm(FCD_tibble2)
 
 
-######### dataframe erstellen im longer format für author und topic als key (entscheidungsvariable) mit jeweiligem topic dahinter ########
+############## DataFrame erstellen im longer-Format für Authors und Topics als Keys ##############
 
-### items datensatz für bearbeitung neu und extra einlesen, da kommas zwischen den subtopics NICHT entfernt werden
-# NICHT ALS NEUE ITEM DATEI ABSPEICHERN!
+### items für Bearbeitung neu und extra einlesen, da Kommas zwischen den subTopics NICHT entfernt werden
+## items aber NICHT ALS NEUE ITEM DATEI ABSPEICHERN!
 items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
@@ -130,159 +149,164 @@ items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   main.topic=col_factor(),
   subtopics=col_factor()
 ))
+
 head(items, n=20)
 glimpse(items)
 
-### datensatz bereinigung hier auch anwenden, allerdings nur auf spalten 2 bis 4, mainTopics und subTopics werden extra behandelt
-### utf8 überall encodieren
-items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"))
-### whitespace von beiden seiten entfernen
-items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both"))
-### alle strings in kleinen buchstaben darstellen
-items[, 2:4] <- sapply(X=items[,2:4], FUN=function(x) str_to_lower(string=x, locale="de")) # locale="english" im default...besser als Deutsch?
-### komische sonderzeichen ersetzen durch "" 
-items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""))
-#items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:alnum:]]", replacement=" "))
+### Datensatz Bereinigung hier auch anwenden, mainTopics und subTopics werden wieder extra behandelt
+## UTF8 encodieren
+items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"), USE.NAMES=F)
+## Whitespace von beiden Seiten entfernen
+items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both") )
+## alle Strings in kleinen Buchstaben darstellen
+items[, 2:4] <- sapply(X=items[,2:4], FUN=function(x) str_to_lower(string=x, locale="de"), USE.NAMES=F )
+## Sonderzeichen ersetzen durch ""
+items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""), USE.NAMES=F) ## ACHTUNG: Replacement muss identisch sein zu Crawler-Daten
+
 head(items, n=20)
 
-### subTopics von sonderzeichen befreien --> KOMMAS BLEIBEN!
+### subTopics von Sonderzeichen befreien --> KOMMAS BLEIBEN!
 items$subtopics <- gsub("\\[|\\]", "", items$subtopics, perl=T)
+
 head(items, n=20)
 
-### mainTopics und subTopics zusammenführen und subtopics als einzelne variable entfernen
+### mainTopics und subTopics zusammenführen und subTopics als einzelne Variable entfernen
 items <- items %>%
-  mutate(uniteTopics = paste(main.topic, subtopics, sep = ",")) %>% # ACHTUNG: Komma nur übergangsweise drin, kann wieder gelöscht werden
+  mutate(uniteTopics = paste(main.topic, subtopics, sep = ",")  ## ACHTUNG: Komma nur für Merge mit Crawler-Daten drin!!
+         ) %>%
   select(-subtopics)
+
 head(items, n=20)
-### dopplungen aus maintopics und subtopics in variable 'uniteTopics' entfernen und mainTopics "kleiner" machen
+
+### Dopplungen aus mainTopics und subTopics in Variable 'uniteTopics' entfernen und mainTopics in Kleinbuchstaben
 rem_dup_word <- function(x) {
   x <- tolower(x)
   paste(unique(trimws(unlist(strsplit(x, split=" ", fixed=F, perl=T) ), which="both" ) ), collapse= " " )
 }
 
-### neue variable items_bearb definieren (damit bei fehler nicht immer skript neu gestartet werden muss!)
-items_bearb <- items
-
-items_bearb <- items_bearb %>%
+### neue Variable items_bearb definieren, damit bei Fehler nicht immer Skript neu geladen werden muss
+items_bearb <- items %>%
   mutate(
-    newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F))) %>%
+    newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F) )
+    ) %>%
   select(-uniteTopics) %>%
   rename(uniteTopics = newTopics, mainTopic = main.topic) %>%
   mutate(
-    mainTopic = tolower(mainTopic))
+    mainTopic = tolower(mainTopic)
+    )
+
 head(items_bearb, n=20)
 str(items_bearb)
 
+### items überschreiben mit items_bearb
 items <- items_bearb
 head(items, n=20)
-#rm(items_bearb, rem_dup_word)
 
-#### funktion definieren, um einzelne topics bzw subtopics in extra variablen aufzuspalten
-split_into_multiple <- function(column, pattern = ",", into_prefix) {
+#### Funktion definieren, um einzelne Topics in uniteTopics in extra Variablen aufzuspalten
+split_into_multiple <- function(column, pattern = ",", into_prefix) { ## Komma zwischen den Variablen entscheidendes Muster für Spaltung
   cols <- str_split_fixed(column, pattern, n=Inf)
-  # Sub out the ""'s returned by filling the matrix to the right, with NAs which are useful
-  cols[which(cols == "")] <- NA
-  cols <- as.data.frame(cols)
-  # jeweilige columns benannt mit "columnName"_Zahl 
-  # where m = Anzahl an Columns für Zahlenbenennung
-  m <- dim(cols)[2]
-  names(cols) <- paste(into_prefix, 1:m, sep = "_")
+  cols[which(cols == "")] <- NA ## NA's statt leere Zellen
+  cols <- as.data.frame(cols) ## als DataFrame abspeichern (als Tibble hat komischerweise immer eine Fehlermeldung gegeben?!)
+  m <- dim(cols)[2] ## m = Anzahl an Columns für Zahlenbenennung
+  names(cols) <- paste(into_prefix, 1:m, sep = "_") ## jeweilige Columns benannt mit "columnName"_Zahl 
   return(cols)
 }
 
-### mittels bind_cols unsere definierte funktion anwenden, einzelne (sub-)topics werden separat aneinander geheftet und mit jeweiligem prefix _1,...,_m als neue variablen definiert
+### mittels bind_cols unsere definierte Funktion anwenden und mit jeweiligem prefix _1,...,_m als neue Variablen definiert
 items_bearb2 <- items_bearb %>% 
-  bind_cols(split_into_multiple(.$uniteTopics, ",", "topic")) %>% 
-  # nur Spalten wählen mit Prefix "_"
-  select(author, starts_with("topic_"))
-head(items_bearb2, n=20) #### nur 33 spalten variablen?
-str(items_bearb2)
+  bind_cols(split_into_multiple(.$uniteTopics, ",", "topic")) %>% ## einzelne Topics werden separat aneinander geheftet
+  select(author, starts_with("topic_")) ## nur Spalten wählen mit Prefix "_" 
 
-### erst einzelne topic variablen im long-format anordnen, sodass jeder autor mehrmals untereinandern mit seinen jeweils vorhandenen topics erscheint
-### danach das dataframe ins weite format übersetzen und dazu die häufigkeit des auftretens n() als entscheidenden wert definieren
-### somit wird pro topic die häufigkeit des auftretens des jeweiligen autors in diesem topic ausgegeben
+str(items_bearb2)
+head(items_bearb2, n=20)
+
+### einmal ins lange Format und wieder zurück...ins weite Format
+## erst einzelne Topics im langen Format anordnen, sodass jeder Autor mehrmals untereinander mit seinen jeweiligen Topics erscheint
+## danach das DataFrame ins weite Format übersetzen und dazu die Häufigkeit des auftretens n() als spread-Wert definieren
+## somit wird pro Topic die Häufigkeit des Auftretens des jeweiligen Autors in diesem Topic ausgegeben
 items_bearb3 <- items_bearb2 %>%
-  gather(topic_1:topic_32, key=numberTopic, value=topic, -author, na.rm=T) %>% # author als linke wichtige entscheidungsvariable lassen
+  gather(topic_1:topic_32, key=numberTopic, value=topic, -author, na.rm=T) %>% ## Author als linke wichtige Entscheidungsvariable lassen
   group_by(author, topic) %>% 
-  summarise(n=n()) %>%
-  spread(key=topic, value=n) ### sagenhafte 1828 variablen
+  summarise(
+    n=n()
+    ) %>%
+  spread(key=topic, value=n) ## sagenhafte 1850 variablen
+
 str(items_bearb3)
 head(items_bearb3, n=20)
-rm(items, items_bearb, items_bearb2, rem_dup_word, split_into_multiple) # funktionen und eingelese items datensätze wieder löschen
+rm(items, items_bearb, items_bearb2, rem_dup_word, split_into_multiple) ## Funktionen und eingelesene items wieder löschen
 
-##############cosine matrix erstellen zwischen autoren und belegung der jeweiligen topics ##########
-# matrix aufbauen, mit den dimensionen entsprechend der anzahl der autoren und subtopis
-AuthMat_subtopics <- items_bearb3 #%>% 
+############## Cosine-Matrix erstellen zwischen Autoren und Belegung der jeweiligen Topics ####################
 
-# Autorennamen abspeichern, da diese später als rownames eingefügt werden
+### Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der Autoren und Subtopis
+AuthMat_subtopics <- items_bearb3
+
+### Autorennamen abspeichern, da diese später als Rownames eingefügt werden
 Authors_subtopics <- AuthMat_subtopics$author
 
-# welchen typen haben die einträge unter den variablen --> character einträge!!
-apply(X=AuthMat_subtopics, MARGIN=2, FUN=class)
+### welchen Typen haben die Einträge unter den Variablen
+apply(X=AuthMat_subtopics, MARGIN=2, FUN=class) ## characters!!
 
-### character werte als integer neu kodieren und in der matrix abspeichern mittels der apply() funktion
+### character Werte als integer neu kodieren und in der Matrix abspeichern mittels der apply() Funktion
 AuthMat_subtopics <- apply(X=AuthMat_subtopics[, 2:ncol(AuthMat_subtopics)], MARGIN=2, FUN=as.integer)
 
-# überprüfung, ob die transformation funktioniert hat
-apply(X=AuthMat_subtopics, MARGIN=2, FUN=class)
+### Überprüfung, ob die Transformation funktioniert hat
+apply(X=AuthMat_subtopics, MARGIN=2, FUN=class) ## hat geklappt!
 
-# nun befindet sich die matrix in der gewünschten formatierung:
-# nn den zeilen stehen die autoren und in den spalten die mainTopics
-# dazu kommt, dass die Spalten nun auch alle numerisch sind, folglich können
-# darauf nun similarity-algorithmen angewendet werden.
+## nun befindet sich die Matrix in der gewünschten Formatierung:
+## in den Zeilen stehen die Autoren und in den Spalten die mainTopics
+## dazu kommt, dass die Spalten nun auch alle numerisch sind, folglich können
+## darauf nun Similarity-Algorithmen angewendet werden.
 
-# grundsätzlich bieten sich hierfür folgende drei an:
-# 1. Pearson Correlation
-# 2. Jaccard Coefficient
-# 3. Cosine Similarity
+### grundsätzlich bieten sich hierfür folgende drei an:
+## 1. Pearson Correlation
+## 2. Jaccard Coefficient
+## 3. Cosine Similarity
 
-# während für die Pearson Correlation schon eine implementierung in {stats}
-# vorhanden ist, benötigen wir für die anderen beiden ein extra package.
-# hierfür wählen wir das package "proxyC" da wir mit diesem sowohl den Jaccard
-# Coefficient berechnen können, als auch die Cosine Similarity
+## während für die Pearson Correlation schon eine Implementierung in {stats}
+## vorhanden ist, benötigen wir für die anderen beiden ein extra Package.
+## hierfür wählen wir das Package "proxyC" da wir mit diesem sowohl den Jaccard Coefficient
+##  berechnen können, als auch die Cosine-Similarity
 
-# Für große Matritzen
-# install.packages("proxyC")
-# library(proxyC)
-
-## zur sicherheit wieder eine neue dummy-matrix erstellen
+### zur Sicherheit wieder eine neue Dummy-Matrix erstellen
 AuthMat0_subtopics <- AuthMat_subtopics
-### zum schnelleren berechnen als na's als "0"-integer abspeichern
+
+### zum schnelleren Berechnen als NA's als "0"-integer abspeichern
 AuthMat0_subtopics[is.na(AuthMat0_subtopics)] <- 0
-### hier auch nochmal extra den mode der mazrix als integer definieren
+
+### hier auch nochmal extra den Mode der Matrix als integer definieren
 mode(AuthMat0_subtopics) <- "integer"
 
-# zeilennamen der matrizen durch due namnen der autoren ersetzen
+### Zeilennamen der Matrizen durch die Namen der Autoren ersetzen
 rownames(AuthMat_subtopics) <- Authors_subtopics
 rownames(AuthMat0_subtopics) <- Authors_subtopics
 
-### sparse matrix erstellen, da sehr recheneffizient und wir sowieso nur integer-werte in der matrix haben
+### Sparse-Matrix erstellen, da sehr recheneffizient und wir sowieso nur integer Werte in der Matrix haben
 AuthMat0sparse_subtopics <- as(AuthMat0_subtopics, "sparseMatrix")
 
+### unwichtige Variablen wieder löschen
 rm(AuthMat0_subtopics, AuthMat_subtopics, Authors_subtopics)
 
-################ Anwendung von proxyC ################################
-### anwendung cosine - akutell beste alternative, da schneller
-
-# dauer der berechnung messen
+### Anwendung Cosine, da 'schnellste' Alternative
+## Dauer der Berechnung messen
 tictoc::tic("Dauer Cosine mit proxyC und drop0 = TRUE")
 
-### parallele berechnung durch nutzung aller verfügbaren kerne sicherstellen
+### parallele Berechnung durch Nutzung aller verfügbaren Kerne sicherstellen
 parallelMap::parallelStartSocket(cpus = parallel::detectCores())
 
-### cosine similarities bestimmen und die "0"en rauswerfen, sodass sie nichts verzerren
+### Cosine-Similarities bestimmen und die "0"en rauswerfen, sodass sie nichts verzerren
 CosineSparse_subtopics <- proxyC::simil(AuthMat0sparse_subtopics, method = "cosine", drop0 = TRUE)
 
 parallelMap::parallelStop()
-tictoc::toc() # etwa 40 sekunden laufzeit bei 8 GB RAM ohne weitere anwendungen nebenbei
+tictoc::toc() ## etwa 40 Sekunden Laufzeit bei 8 GB RAM ohne weitere Anwendungen nebenbei
 
-### wie groß ist unsere datei?
-object.size(CosineSparse_subtopics) ### knapp 1.2 GB !!
+### wie groß ist unsere Datei?
+object.size(CosineSparse_subtopics) ## knapp 1.2 GB !!
 
 ### Matrix abspeichern im Harwell-Boeing-Format
-#Matrix::writeMM(obj=CosineSparse_subtopics, file="CosineSparse_subtopics.mtx")
+# Matrix::writeMM(obj=CosineSparse_subtopics, file="CosineSparse_subtopics.mtx")
 
-########### items-uniteTopics-Matrix nach gleichem Schema erstellen ######
+############### items-uniteTopics-Matrix nach gleichem Schema erstellen ################
 items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   itemID=col_factor(),
   title=col_character(),
@@ -291,120 +315,136 @@ items <- read_csv(file="./Data/items5.csv", col_names=T, col_types=cols(
   main.topic=col_factor(),
   subtopics=col_factor()
 ))
+
 head(items, n=20)
 glimpse(items)
 
-### utf8 überall encodieren
-items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"))
-### whitespace von beiden seiten entfernen
-items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both"))
-### alle strings in Großbuchstaben darstellen
-items[, 2:4] <- sapply(X=items[,2:4], FUN=function(x) str_to_lower(string=x, locale="de")) # locale="english" im default...besser als Deutsch?
-### komische sonderzeichen ersetzen durch "" 
-items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""))
-#items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:alnum:]]", replacement=" "))
+### Datensatz Bereinigung hier auch anwenden, mainTopics und subTopics werden wieder extra behandelt
+## UTF8 encodieren
+items[, 2:6] <- sapply(X=items[, 2:6], FUN=function(x) str_conv(string=x, encoding="UTF-8"), USE.NAMES=F)
+## Whitespace von beiden Seiten entfernen
+items[, 2:4] <- apply(items[, 2:4], MARGIN=2, FUN=function(x) str_trim(string=x,side="both") )
+## alle Strings in kleinen Buchstaben darstellen
+items[, 2:4] <- sapply(X=items[,2:4], FUN=function(x) str_to_lower(string=x, locale="de"), USE.NAMES=F )
+## Sonderzeichen ersetzen durch ""
+items[, 2:4] <- sapply(X=items[, 2:4], FUN=function(x) str_replace_all(string=x, pattern="[[:punct:]]", replacement=""), USE.NAMES=F) ## ACHTUNG: Replacement muss identisch sein zu Crawler-Daten
+
 head(items, n=20)
 
-### subTopics von sonderzeichen befreien
+### subTopics von Sonderzeichen befreien --> KOMMAS BLEIBEN!
 items$subtopics <- gsub("\\[|\\]", "", items$subtopics, perl=T)
-#items$subtopics <- gsub(","," ",items$subtopics)
+
 head(items, n=20)
 
-### mainTopics und subTopics zusammenführen und subtopics als einzelne variable entfernen
+### mainTopics und subTopics zusammenführen und subTopics als einzelne Variable entfernen
 items <- items %>%
-  mutate(uniteTopics = paste(main.topic, subtopics, sep = ",")) %>% # ACHTUNG: Komma nur übergangsweise drin, kann wieder gelöscht werden
+  mutate(uniteTopics = paste(main.topic, subtopics, sep = ",")  ## ACHTUNG: Komma nur für Merge mit Crawler-Daten drin!!
+  ) %>%
   select(-subtopics)
+
 head(items, n=20)
-### dopplungen aus maintopics und subtopics in variable 'uniteTopics' entfernen und mainTopics "kleiner" machen
+
+### Dopplungen aus mainTopics und subTopics in Variable 'uniteTopics' entfernen und mainTopics in Kleinbuchstaben
 rem_dup_word <- function(x) {
   x <- tolower(x)
   paste(unique(trimws(unlist(strsplit(x, split=" ", fixed=F, perl=T) ), which="both" ) ), collapse= " " )
 }
 
-### neue variable items_bearb definieren (damit bei fehler nicht immer skript neu gestartet werden muss!)
-items_bearb <- items
-
-items_bearb <- items_bearb %>%
+### neue Variable items_bearb definieren, damit bei Fehler nicht immer Skript neu geladen werden muss
+items_bearb <- items %>%
   mutate(
-    newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F))) %>%
+    newTopics = unlist(sapply(uniteTopics, FUN=rem_dup_word, USE.NAMES=F) )
+  ) %>%
   select(-uniteTopics) %>%
   rename(uniteTopics = newTopics, mainTopic = main.topic) %>%
   mutate(
-    mainTopic = tolower(mainTopic))
+    mainTopic = tolower(mainTopic)
+  )
+
 head(items_bearb, n=20)
 str(items_bearb)
 
+### items überschreiben mit items_bearb
 items <- items_bearb
+
 head(items, n=20)
 
-#### funktion um einzelne topics in extra variablen aufzuspalten
-split_into_multiple <- function(column, pattern = ",", into_prefix) {
+#### Funktion definieren, um einzelne Topics in uniteTopics in extra Variablen aufzuspalten
+split_into_multiple <- function(column, pattern = ",", into_prefix) { ## Komma zwischen den Variablen entscheidendes Muster für Spaltung
   cols <- str_split_fixed(column, pattern, n=Inf)
-  # Sub out the ""'s returned by filling the matrix to the right, with NAs which are useful
-  cols[which(cols == "")] <- NA
-  cols <- as.data.frame(cols)
-  # jeweilige columns benannt mit "columnName"_Zahl 
-  # where m = Anzahl an Columns für Zahlenbenennung
-  m <- dim(cols)[2]
-  names(cols) <- paste(into_prefix, 1:m, sep = "_")
+  cols[which(cols == "")] <- NA ## NA's statt leere Zellen
+  cols <- as.data.frame(cols) ## als DataFrame abspeichern (als Tibble hat komischerweise immer eine Fehlermeldung gegeben?!)
+  m <- dim(cols)[2] ## m = Anzahl an Columns für Zahlenbenennung
+  names(cols) <- paste(into_prefix, 1:m, sep = "_") ## jeweilige Columns benannt mit "columnName"_Zahl 
   return(cols)
 }
 
+### mittels bind_cols unsere definierte Funktion anwenden und mit jeweiligem prefix _1,...,_m als neue Variablen definiert
 items_bearb2 <- items_bearb %>% 
-  bind_cols(split_into_multiple(.$uniteTopics, ",", "topic")) %>% 
-  # nur Spalten wählen mit Prefix "_"
-  select(itemID, starts_with("topic_"))
+  bind_cols(split_into_multiple(.$uniteTopics, ",", "topic")) %>% ## einzelne Topics werden separat aneinander geheftet
+  select(itemID, starts_with("topic_")) ## nur Spalten wählen mit Prefix "_"
 
+str(items_bearb2)
+head(items_bearb2, n=20)
+
+### einmal ins lange Format und wieder zurück...ins weite Format
+## erst einzelne Topics im langen Format anordnen, sodass jede itemID mehrmals untereinander mit seinen jeweiligen Topics erscheint
+## danach das DataFrame ins weite Format übersetzen und dazu die Häufigkeit des auftretens n() als spread-Wert definieren
+## somit wird pro Topic die Häufigkeit des Auftretens der jeweiligen itemID in diesem Topic ausgegeben
 items_bearb3 <- items_bearb2 %>%
-  gather(topic_1:topic_32, key=numberTopic, value=topic, -itemID, na.rm=T) %>% # author als linke wichtige entscheidungsvariable lassen
+  gather(topic_1:topic_32, key=numberTopic, value=topic, -itemID, na.rm=T) %>% ## itemID als linke wichtige Entscheidungsvariable lassen
   group_by(itemID, topic) %>% 
-  summarise(n=n()) %>%
-  spread(key=topic, value=n)
+  summarise(
+    n=n()
+  ) %>%
+  spread(key=topic, value=n) ## sagenhafte 1850 variablen
+
 str(items_bearb3)
 head(items_bearb3, n=20)
-rm(items, items_bearb, items_bearb2, rem_dup_word, split_into_multiple) # funktionen und eingelese items datensätze wieder löschen
 
-##############cosine matrix erstellen zwischen autoren und belegung der jeweiligen topics ##########
-### matrix aufbauen, mit den dimensionen entsprechend der anzahl der item id's und der subTopics
-itemMat_subtopics <- items_bearb3 #%>% 
+rm(items, items_bearb, items_bearb2, rem_dup_word, split_into_multiple) ## Funktionen und eingelesene items wieder löschen
 
-### item id's abspeichern, da diese später als rownames eingefügt werden
+############## Cosine-Matrix erstellen zwischen itemID und Belegung der jeweiligen Topics #############
+
+### Matrix aufbauen, mit den Dimensionen entsprechend der Anzahl der itemID und der subTopics
+itemMat_subtopics <- items_bearb3
+
+### itemID abspeichern, da diese später als Rownames eingefügt werden
 items_subtopics <- itemMat_subtopics$itemID
-
-#apply(X=itemMat_subtopics, MARGIN=2, FUN=class)
 
 itemMat_subtopics <- apply(X=itemMat_subtopics[, 2:ncol(itemMat_subtopics)], MARGIN=2, FUN=as.integer)
 
-### überprüfung, ob transformation funktioniert hat
-apply(X=itemMat_subtopics, MARGIN=2, FUN=class) # top
+### Überprüfung, ob Transformation funktioniert hat
+apply(X=itemMat_subtopics, MARGIN=2, FUN=class) ## hat geklappt
 
-### na's als "0" und ansosnte auch der mode als integer
+### NA's als "0" und ansonsten auch der Mode als integer
 itemMat0_subtopics <- itemMat_subtopics
 itemMat0_subtopics[is.na(itemMat0_subtopics)] <- 0
 mode(itemMat0_subtopics) <- "integer"
 
-### rownames der items id's einfügen
+### Rownames der itemID's einfügen
 rownames(itemMat_subtopics) <- items_subtopics
 rownames(itemMat0_subtopics) <- items_subtopics
 
-### sparse matrix aufbauen
+### Sparse-Matrix aufbauen
 itemMat0sparse_subtopics <- as(itemMat0_subtopics, "sparseMatrix")
 
+### unwichtige Variablen löschen
 rm(itemMat0_subtopics, itemMat_subtopics, items_subtopics, items_bearb3)
 
-############ Anwendung von proxyC ##############
-
 ### Anwendung Cosine
-
 tictoc::tic("Dauer Cosine mit proxyC und drop0 = TRUE")
 parallelMap::parallelStartSocket(cpus = parallel::detectCores())
 
 itemsCosineSparse_subtopics <- proxyC::simil(itemMat0sparse_subtopics, method = "cosine", drop0 = TRUE)
 
 parallelMap::parallelStop()
-tictoc::toc() # etwa 40 sekunden laufzeit bei 8 GB RAM ohne weitere anwendungen nebenbei
+tictoc::toc() # etwa 40 Sekunden Laufzeit bei 8 GB RAM ohne weitere Anwendungen nebenbei
 
+### Größe der Datei
 object.size(itemsCosineSparse_subtopics) ### knapp 4.2 GB
 
 #### matrix abspeichern
-#Matrix::writeMM(obj=itemsCosineSparse_subtopics, file="itemsCosineSparse_subtopics.mtx")
+# Matrix::writeMM(obj=itemsCosineSparse_subtopics, file="itemsCosineSparse_subtopics.mtx")
+
+###################### Ende ########################

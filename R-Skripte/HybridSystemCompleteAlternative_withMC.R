@@ -54,7 +54,7 @@ AuthMat <- read.csv("./Data/AuthMat_subtopics.csv", check.names = FALSE)
 Authors <- AuthMat$author
 
 # Spalten in integer konvertieren
-AuthMat <- apply(AuthMat[2:ncol(AuthMat)],2,as.integer)
+AuthMat <- apply(AuthMat[, 2:ncol(AuthMat)], 2, as.integer)
 
 # Die NA's durch Nullen ersetzen
 AuthMat[is.na(AuthMat)] <- 0
@@ -213,6 +213,8 @@ totalInfo <- totalInfo %>% left_join(FCD_tibble, by = "title")
 
 # Erzeugung der Variable titelUndBeschreibung, um Text Mining zu verbessern
 totalInfo <- totalInfo %>% mutate(titleUndBeschreibung = paste(title, Beschreibung, sep = " "))
+
+head(totalInfo, n=20)
 
 # Nicht mehr benÃÂ¶tigte DatensÃÂ¤tze lÃÂ¶schen, um Speicherplatz zu sparen
 rm(clicked, basket, ordered, inDupSes, itemsInTrans, items6, transactions, FCD_tibble)
