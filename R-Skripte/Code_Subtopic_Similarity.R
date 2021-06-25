@@ -33,9 +33,9 @@ items_dtm2000 <- items_dtm2000[, doc_freq >= 2]
 
 ### cosine similarity berechnen
 cos_similarity <- function(A,B) {
-  num = sum(A*B, na.rm=T)
-  den = sqrt(sum(A^2, na.rm=T)) * sqrt(sum(B^2, na.rm=T))
-  result = num/den
+  oben = sum(A*B, na.rm=T)
+  unten = sqrt(sum(A^2, na.rm=T)) * sqrt(sum(B^2, na.rm=T))
+  result = oben/unten
   
   return(result)
 }
