@@ -2,8 +2,8 @@
 
 # Working Directory Definieren
 
-setwd("/Users/ejahnke/Git/Data_Analytics_Challenge/Data")
 getwd()
+setwd("/Users/ejahnke/Git/Data_Analytics_Challenge/Data")
 
 # Packages installieren
 
@@ -54,7 +54,7 @@ AuthMat <- read.csv("AuthMat_subtopics.csv", check.names = FALSE)
 Authors <- AuthMat$author
 
 # Spalten in integer konvertieren
-AuthMat <- apply(AuthMat[, 2:ncol(AuthMat)], MARGIN=2, as.integer)
+AuthMat <- apply(AuthMat[2:ncol(AuthMat)],2,as.integer)
 
 # Die NA's durch Nullen ersetzen
 AuthMat[is.na(AuthMat)] <- 0
@@ -239,6 +239,11 @@ normalize <- function(x){
   return(norm)
 }
 
+minMaxNormalize = function(x){
+  norm <- (x - min(x)) / (max(x) - min(x))
+  return(norm)
+} 
+
 ### Definition der Funktion 'makeDTM'
 
 # Da im weiteren Verlauf Fallunterscheidungen (if-Statements) auftreten, 
@@ -258,17 +263,7 @@ makeDTM <- function(x) {
     tm_map(removeWords, stopwords("english")) %>% 
     tm_map(removeWords, stopwords("german")) %>%
     tm_map(removeWords, stopwords("french")) %>%
-    tm_map(removeWords, stopwords("spanish")) %>%
-    tm_map(removeWords, stopwords("catalan")) %>%
-    tm_map(removeWords, stopwords("danish")) %>%
-    tm_map(removeWords, stopwords("dutch")) %>%
-    tm_map(removeWords, stopwords("finnish")) %>%
-    tm_map(removeWords, stopwords("hungarian")) %>%
-    tm_map(removeWords, stopwords("norwegian")) %>%
-    tm_map(removeWords, stopwords("portuguese")) %>%
-    tm_map(removeWords, stopwords("russian")) %>%
-    tm_map(removeWords, stopwords("swedish")) %>%
-    tm_map(removeWords, stopwords("romanian")) %>%
+    tm_map(removeWords, stopwords("spanish")) %>% 
     tm_map(removeWords, c("NA","•","»","®", "–", "¡", "¿", "—"))
   
   # Als nächstes wird der Corpus in eine TF-IDF-Matrix überführt:
@@ -293,6 +288,10 @@ makeAllTitles <- function(activeItem){
   
   activeTitel1 <- activeAuthorAndTitel$title[activeItem] # hier loopen
   activeTitel1
+  
+  activePublisher1 <- activeAuthorAndTitel$publisher[activeItem] # hier loopen
+  activePublisher1
+  
   
   aA1_NeighorsCos <- CosineSparse[activeAuthor1,][CosineSparse[activeAuthor1,] != 0]
   
@@ -346,19 +345,19 @@ makeAllTitles <- function(activeItem){
     if(nrow(allTitelKNN) > 300){
       allTitelKNN <- totalInfo %>% 
         filter(author %in% aA1_top10NeigbhorsCos) %>% 
-        filter(clicked == TRUE | basket == TRUE | ordered == TRUE)
+        filter(clicked == TRUE | basket == TRUE | ordered == TRUE | publisher == activePublisher1)
     } 
     
     if(nrow(allTitelKNN) > 300){
       allTitelKNN <- totalInfo %>% 
         filter(author %in% aA1_top10NeigbhorsCos) %>% 
-        filter(basket == TRUE | ordered == TRUE) 
+        filter(basket == TRUE | ordered == TRUE| publisher == activePublisher1) 
     } 
     
     if(nrow(allTitelKNN) > 300){
       allTitelKNN <- totalInfo %>% 
         filter(author %in% aA1_top10NeigbhorsCos) %>% 
-        filter(ordered == TRUE) 
+        filter(ordered == TRUE| publisher == activePublisher1) 
     } 
     
     # Jetzt müssen noch das Ziel-Buch, die Titel des Autoren und die der kNN
@@ -370,7 +369,7 @@ makeAllTitles <- function(activeItem){
     allTitles <- rbind(activeTitel1MitBeschreibung, allTitelActAuth1, allTitelKNN)
     
     # Hier auch nochmal die duplicates rausschmeißen
-    allTitles <- allTitles %>% distinct(title, author, .keep_all = TRUE) # schmei?t alle mit der gleichen itemID raus
+    allTitles <- allTitles %>% distinct(title, author, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
     
     return(allTitles)
     
@@ -386,7 +385,7 @@ makeAllTitles <- function(activeItem){
 # weiteren Verlauf den anderen Komponenten dieses hybriden Systems gegenüber
 # gestellt.
 
-TM_Recommendations <- function(activeItem, simThresh = 0.014){
+TM_Recommendations <- function(activeItem, simThreshTM){
   # Der obige Schwellenwert von 0.014 wurde im Zuge der Recommendations für die
   # ersten 100 Items empirisch ermittelt.
   
@@ -394,8 +393,7 @@ TM_Recommendations <- function(activeItem, simThresh = 0.014){
   
   allTitles <- allTitles %>% 
     select(itemID, titleUndBeschreibung) %>% 
-    rename(doc_id = itemID, text = titleUndBeschreibung) %>%
-    distinct(text, .keep_all=T) ######### ACHTUNG: EINGEFÜGT VON ERIC AM 25.JUNI
+    rename(doc_id = itemID, text = titleUndBeschreibung)
   
   DTM <- makeDTM(allTitles)
   
@@ -403,10 +401,12 @@ TM_Recommendations <- function(activeItem, simThresh = 0.014){
   # ein zentrales Kriterium für proxyC ist - müssen wir die cosine-Function aus
   # einem anderen Paket benutzen
   
+  DTMsparse <- as(as.matrix(DTM), "sparseMatrix")
+  
   tic("Dauer Cosine Similarity der Titel")
   parallelStartSocket(cpus = detectCores())
   
-  CosineTitel <- lsa::cosine(t(as.matrix(DTM)))
+  CosineTitel <- proxyC::simil(DTMsparse, method = "cosine", drop0 = TRUE)
   
   parallelStop()
   toc()
@@ -419,8 +419,8 @@ TM_Recommendations <- function(activeItem, simThresh = 0.014){
   # topRecc <- top5Recc[top5Recc != 0]
   # hier kann man überlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
-  topRecc <- top5Recc[top5Recc >= simThresh]
-  topRecc <- normalize(topRecc)
+  topRecc <- top5Recc[top5Recc >= simThreshTM]
+  topRecc <- minMaxNormalize(topRecc)
   #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
   return(topRecc)
   
@@ -428,7 +428,7 @@ TM_Recommendations <- function(activeItem, simThresh = 0.014){
 
 ### Definition von UniteTops_Recommendations
 
-UniteTopics_Recommendations <- function(activeItem, simThresh = 0.3) {
+UniteTopics_Recommendations <- function(activeItem, simThreshUT) {
   # Der obige Schwellenwert von 0.3 wurde im Zuge der Recommendations für die
   # ersten 100 Items empirisch ermittelt.
   
@@ -454,8 +454,8 @@ UniteTopics_Recommendations <- function(activeItem, simThresh = 0.3) {
   # topRecc <- top5Recc[top5Recc != 0]
   # hier kann man überlegen, ob != 0 Sinn macht, oder man nicht stattdessen sowas nimmt
   # wie >= 0.05 um Zufallstreffer rauszufiltern
-  topRecc <- top5Recc[top5Recc >= simThresh] # 0.5 teilweise schon zu aggressiv
-  topRecc <- normalize(topRecc)
+  topRecc <- top5Recc[top5Recc >= simThreshUT] # 0.5 teilweise schon zu aggressiv
+  topRecc <- minMaxNormalize(topRecc)
   #print(paste("For Item", activeTitel1, "the top Recommendations are:", sep = " "))
   return(topRecc)
   
@@ -473,6 +473,11 @@ UniteTopics_Recommendations <- function(activeItem, simThresh = 0.3) {
 
 ################################################################################
 
+# activeItem <- 25
+# weightClicks <- 0.05
+# weightBasket <- 0.4
+# weightOrder <- 0.55
+
 #Recommendation Function based on sessionID
 
 Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBasket, weightOrder){
@@ -480,19 +485,36 @@ Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBask
   activeItemID <- activeAuthorAndTitel$itemID[activeItem] # hier loopen
   activeItemID
   
+  activeTitel <- activeAuthorAndTitel$title[activeItem] # hier loopen
+  activeTitel
+  
+  activeAuthor <- activeAuthorAndTitel$author[activeItem] # hier loopen
+  activeAuthor 
+  
   this_ses <- dup.ses %>% group_by(sessionID) %>%   
     filter(itemID==activeItemID) %>% select(sessionID)
   
   this_ses <- this_ses$sessionID
   
-  this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID) 
+  this_books_tbl <- dup.ses %>% filter(sessionID%in%this_ses) %>% arrange(sessionID)
   
-  potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% filter(itemID != activeItemID)%>% 
-    summarise(nClick=sum(click),nBasket=sum(basket),nOrder=sum(order)) %>%
-    arrange(desc(nClick))
+  # hier Bücher herausfiltern, die den gleichen Titel haben wie das Ziel-Item
+  this_books_tbl <- this_books_tbl %>% filter(!identical(title, activeTitel) & !identical(author, activeAuthor))
   
-  potential_recommendations <- potential_recommendations %>% 
-    mutate(kennzahl = (nClick*weightClicks + nBasket*weightBasket + nOrder*weightOrder)/sum(weightClicks,weightBasket,weightOrder))
+  # jetzt zudem noch alle duplicates innerhalb des tibbles entfernen
+  this_books_tbl <- this_books_tbl %>% distinct(title, author, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
+  
+  potential_recommendations <- this_books_tbl %>% group_by(itemID) %>% 
+    filter(itemID != activeItemID) %>%
+    summarise(nClick=sum(click),nBasket=sum(basket),nOrder=sum(order)) %>% 
+    mutate(nClick = nClick*weightClicks, nBasket = nBasket*weightBasket, nOrder = nOrder*weightOrder) %>%
+    mutate(ClickBasketRatio = ifelse(nBasket == 0, 0, nBasket/nClick),
+           ClickBasketRatio = ifelse(nClick == 0, nBasket/0.01, nBasket/nClick),
+           BasketOrderRatio = ifelse(nOrder == 0, 0, nOrder/nBasket),
+           BasketOrderRatio = ifelse(nBasket == 0, nOrder/0.01, nOrder/nBasket),
+           ClickOrderRatio = ifelse(nOrder == 0, 0, nOrder/nClick),
+           ClickOrderRatio = ifelse(nClick == 0, nOrder/0.01, nOrder/nClick))  %>% 
+    mutate(kennzahl = ClickBasketRatio + BasketOrderRatio + ClickOrderRatio)
   
   potential_recommendations <- potential_recommendations %>% select(itemID,kennzahl) %>% arrange(desc(kennzahl)) %>%
     filter(itemID != activeItemID) #%>% slice_max(kennzahl,n=10)  
@@ -503,7 +525,7 @@ Recommendation_function_inDupSes <- function(activeItem,weightClicks, weightBask
   
   names(kpi) <- item_names
   
-  kpi <- normalize(kpi)
+  kpi <- minMaxNormalize(kpi)
   
   return(kpi)
 }
@@ -518,7 +540,7 @@ Notausgang_funktion <- function(activeItem){
   activeItemID
   
   selected_features <- totalInfo %>% filter(itemID==activeItemID) %>%
-    select(itemID,author,mainTopic,publisher)    #nehmen von totalInfo ausgewählte wichtigste Spalten zum Suchen
+    select(itemID,author,mainTopic,publisher)    #nehmen von OR_tbl ausgewählte Spalten
   
   this_author <- selected_features$author         #als chr darstellen 
   
@@ -526,7 +548,7 @@ Notausgang_funktion <- function(activeItem){
   
   this_genre <- selected_features$mainTopic
   
-  items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre) #filter einsetzen
+  items_select <- totalInfo %>% filter(author==this_author | publisher==this_publisher & mainTopic==this_genre)#filter einsetzen
   
   #set.seed(123)
   top_seller_by_mainTopic <- joined_oR %>%
@@ -542,6 +564,9 @@ Notausgang_funktion <- function(activeItem){
     ) %>%
     distinct(.keep_all = T)
   
+  # Hier auch nochmal die duplicates rausschmeißen
+  top_seller_by_mainTopic <- top_seller_by_mainTopic %>% distinct(title, author, .keep_all = TRUE) # schmei?t alle mit dem gleichen titel raus
+  
   nimm_5 <- top_seller_by_mainTopic %>%
     filter(mainTopic == this_genre & itemID != activeItemID) %>%
     arrange(desc(sumOrders)) %>%
@@ -556,7 +581,9 @@ Notausgang_funktion <- function(activeItem){
     nimmRandom <- items_select %>% filter(itemID %in% items_select$itemID[!items_select$itemID %in% nimm_5])
     
     set.seed(123)
-    nimmRandom <- slice_sample(nimmRandom, n = values_left)
+    nimmRandom <- slice_sample(nimmRandom, n = values_left, replace = FALSE)
+    # durch replace = FALSE wird zumindest die identische ItemID nicht mehr gezogen,
+    # nichtsdestotrotz könnte das Item immer noch ein Duplicate sein
     nimmRandom <- nimmRandom$itemID
     
     nimm_5 <- c(nimm_5, nimmRandom)
@@ -571,20 +598,24 @@ Notausgang_funktion <- function(activeItem){
 # Notausgang_funktion(999)
 
 #Struktur von finalen Funktion
-# activeItem <- 444 # 4 fÃ¼r Fall 1, 25 fÃ¼r Fall 2, 2 fÃ¼r Fall 3, 23 fÃ¼r Fall 4
+# activeItem <- 257 # 4 fÃ¼r Fall 1, 25 fÃ¼r Fall 2, 2 fÃ¼r Fall 3, 23 fÃ¼r Fall 4
 # 
-# weightTM = 0.33
-# weightUT = 0.33
-# weightDupSes = 0.34
+# weightTM = 0.3314368
+# weightUT = 0.2146733
+# weightDupSes = 0.4538899
 # 
 # weightClicks = 0.2
 # weightBasket = 0.3
 # weightOrder = 0.5
-#  
+# 
+# simThreshTM = 0.014
+# simThreshUT = 0.3
+
 # rm(activeItem, weightTM, weightUT, weightDupSes, weightClicks, weightBasekt, weightOrder)
 
 HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, weightDupSes = 1/3, 
-                                 weightClicks = 0.2, weightBasket = 0.3, weightOrder = 0.5){
+                                 weightClicks = 0.2, weightBasket = 0.3, weightOrder = 0.5,
+                                 simThreshTM = 0.014, simThreshUT = 0.3){
   
   # Frage: soll ich dann, in den FÃ¤llen ab Fall 1 die Gewichtungen auf einen Wert von 1 skalieren,
   # sodass bspw. weightTM und weightUT als 0.5 dargestellt werden?
@@ -592,7 +623,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   
   activeItemID <- activeAuthorAndTitel$itemID[activeItem]
   
-  activeItemInfo <- totalInfo %>% filter(itemID==activeItemID) %>% select(itemID, uniteTopics, Beschreibung, inDupSes)
+  activeItemInfo <- totalInfo %>% filter(itemID==activeItemID)%>% select(itemID,uniteTopics,Beschreibung,inDupSes)
   
   hasSubtopics <- !activeItemInfo %>% select(uniteTopics) %>% is.na()
   
@@ -601,10 +632,10 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   #Fall_1: Subtopic + Klappentext + inDupSes =alle sind True
   if (hasSubtopics == TRUE & hasKlappentext == TRUE & activeItemInfo$inDupSes == TRUE){
     
-    result_TM <- TM_Recommendations(activeItem) * weightTM
+    result_TM <- TM_Recommendations(activeItem, simThreshTM) * weightTM
     itemsFromTM <- names(result_TM)
     
-    result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
+    result_UT <- UniteTopics_Recommendations(activeItem, simThreshUT) * weightUT
     itemsFromUT <- names(result_UT)
     
     result_inDupSes <- Recommendation_function_inDupSes(activeItem, weightClicks, weightBasket, weightOrder) * weightDupSes
@@ -662,7 +693,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   #Fall_2: Subtopic + inDupSes .   kein Klappentext == NA 
   if(hasSubtopics == TRUE & hasKlappentext == FALSE & activeItemInfo$inDupSes == TRUE){
     
-    result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
+    result_UT <- UniteTopics_Recommendations(activeItem, simThreshUT) * weightUT
     itemsFromUT <- names(result_UT)
     
     result_inDupSes <- Recommendation_function_inDupSes(activeItem, weightClicks, weightBasket, weightOrder) * weightDupSes
@@ -712,10 +743,10 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   #Fall_3:Subtopic + Klappentext. Nicht in dup.ses.
   if (hasSubtopics == TRUE & hasKlappentext == TRUE & activeItemInfo$inDupSes == FALSE){
     
-    result_TM <- TM_Recommendations(activeItem) * weightTM
+    result_TM <- TM_Recommendations(activeItem, simThreshTM) * weightTM
     itemsFromTM <- names(result_TM)
     
-    result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
+    result_UT <- UniteTopics_Recommendations(activeItem, simThreshUT) * weightUT
     itemsFromUT <- names(result_UT)
     
     all_potential_recom <- c(itemsFromTM, itemsFromUT)
@@ -762,7 +793,7 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
   #Fall_4: Nur Subtopic Simularity, kein KT, nicht in Dup.ses.   #Obwohl ich bin mir nicht sicher, ob dieser Fall kommt oder soll gleich NOTAUSGANGFUNKTION angeschaltet werden
   if (hasSubtopics == TRUE & hasKlappentext == FALSE & activeItemInfo$inDupSes == FALSE){
     
-    result_UT <- UniteTopics_Recommendations(activeItem) * weightUT
+    result_UT <- UniteTopics_Recommendations(activeItem, simThreshUT) * weightUT
     itemsFromUT <- names(result_UT)
     
     all_potential_recom <- itemsFromUT
@@ -806,10 +837,18 @@ HybridRecommendation <- function(activeItem, weightTM = 1/3, weightUT = 1/3, wei
 # tic("Start Hybrid Recommendation")
 # test <- HybridRecommendation(activeItem = 4)
 # toc()
-# 
-# tic("Start Hybrid Recommendation")
-# test2 <- HybridRecommendation(activeItem = 444, weightTM = 0.3314368, weightUT = 0.2146733, weightDupSes =  0.4538899)
-# toc()
+ 
+tic("Start Hybrid Recommendation")
+HybridRecommendation(activeItem = 20, 
+                     weightTM = 0.2219223, 
+                     weightUT = 0.5233960, 
+                     weightDupSes =  0.2546817,
+                     weightClicks = 0.4329914,
+                     weightBasket = 0.2401717,
+                     weightOrder = 0.3268369,
+                     simThreshTM = 0.5401400,
+                     simThreshUT = 0.4940400)
+toc()
 
 # 
 # test
@@ -833,8 +872,29 @@ MonteCarlo <- function(targetItem, NumberOfRepetitions){
   randomWeightsBest <- normalize(randomWeightsBest)
   randomWeightsBest
   
-  best <- HybridRecommendation(activeItem = targetItem, weightTM = randomWeightsBest[1], 
-                               weightUT = randomWeightsBest[2], weightDupSes = randomWeightsBest[3])
+  set.seed(1001)
+  randomWeightsARMBest <- sample(1:100, 3)
+  randomWeightsARMBest <- normalize(randomWeightsARMBest)
+  randomWeightsARMBest
+  
+  set.seed(1)
+  randomThreshTMBest <- sample(seq(from = 0, to = 0.4, by = 0.0001), 1)
+  randomThreshTMBest
+  
+  set.seed(1001)
+  randomThreshUTBest <- sample(seq(from = 0.3, to = 1, by = 0.0001), 1)
+  randomThreshUTBest
+  
+  best <- HybridRecommendation(activeItem = targetItem, 
+                               weightTM = randomWeightsBest[1], 
+                               weightUT = randomWeightsBest[2], 
+                               weightDupSes = randomWeightsBest[3],
+                               weightClicks = randomWeightsARMBest[1],
+                               weightBasket = randomWeightsARMBest[2],
+                               weightOrder = randomWeightsARMBest[3],
+                               simThreshTM = randomThreshTMBest,
+                               simThreshUT = randomThreshUTBest
+  )
   
   sumBest <- sum(best)
   sumBest
@@ -846,8 +906,30 @@ MonteCarlo <- function(targetItem, NumberOfRepetitions){
     randomWeightsTest <- normalize(randomWeightsTest)
     randomWeightsTest
     
-    test <- HybridRecommendation(activeItem = targetItem, weightTM = randomWeightsTest[1], 
-                                 weightUT = randomWeightsTest[2], weightDupSes = randomWeightsTest[3])
+    set.seed(1000+idx)
+    randomWeightsARMTest <- sample(1:100, 3)
+    randomWeightsARMTest <- normalize(randomWeightsARMTest)
+    randomWeightsARMTest
+    
+    set.seed(idx)
+    randomThreshTMTest <- sample(seq(from = 0, to = 1, by = 0.0001), 1)
+    randomThreshTMTest
+    
+    set.seed(1000+idx)
+    randomThreshUTTest <- sample(seq(from = 0, to = 1, by = 0.0001), 1)
+    randomThreshUTTest
+    
+    test <- HybridRecommendation(activeItem = targetItem, 
+                                 weightTM = randomWeightsTest[1], 
+                                 weightUT = randomWeightsTest[2], 
+                                 weightDupSes = randomWeightsTest[3],
+                                 weightClicks = randomWeightsARMTest[1],
+                                 weightBasket = randomWeightsARMTest[2],
+                                 weightOrder = randomWeightsARMTest[3],
+                                 simThreshTM = randomThreshTMTest,
+                                 simThreshUT = randomThreshUTTest
+    )
+    
     
     sumTest <- sum(test)
     sumTest
@@ -855,14 +937,21 @@ MonteCarlo <- function(targetItem, NumberOfRepetitions){
     if(sumTest > sumBest){
       
       randomWeightsBest <- randomWeightsTest
+      randomWeightsARMBest <- randomWeightsARMTest
+      randomThreshTMBest <- randomThreshTMTest
+      randomThreshUTBest <- randomThreshUTTest
+      
       sumBest <- sumTest
       
     }
     
   }
   
-  SumAndWeights <- c(sumBest, randomWeightsBest)
-  returnNames <- c("Sum of Similarities", "weightTM", "weightUT", "weightDupSes")
+  SumAndWeights <- c(sumBest, randomWeightsBest, randomWeightsARMBest,
+                     randomThreshTMBest, randomThreshUTBest)
+  returnNames <- c("Sum of Similarities", "weightTM", "weightUT", "weightDupSes",
+                   "weightClicks", "weightBasket", "weightOrder",
+                   "simThreshTM", "simThreshUT")
   names(SumAndWeights) <- returnNames
   
   return(SumAndWeights)
@@ -882,8 +971,10 @@ MonteCarlo <- function(targetItem, NumberOfRepetitions){
 
 MultipleMC <- function(multipleItems, NumberOfRepetitionsPerItem){
   
-  resultMat <- matrix(NA, nrow = length(multipleItems), ncol = 5)
-  resultMatNames <- c("ItemIndex", "Sum of Similarities", "weightTM", "weightUT", "weightDupSes")
+  resultMat <- matrix(NA, nrow = length(multipleItems), ncol = 10)
+  resultMatNames <- c("ItemIndex", "Sum of Similarities", "weightTM", "weightUT", "weightDupSes",
+                      "weightClicks", "weightBasket", "weightOrder",
+                      "simThreshTM", "simThreshUT")
   colnames(resultMat) <- resultMatNames
   resultMat
   
@@ -903,8 +994,7 @@ MultipleMC <- function(multipleItems, NumberOfRepetitionsPerItem){
   
 }
 
-# x <- c(257, 999, 4)
-# 
+# x <- c(664, 973, 652, 942, 648)
 # tic("Testlauf Multiple Monte Carlo - 3 Items, 5 Iterationen pro Item")
 # ErgebnisMMC <- MultipleMC(x, 5)
 # toc()
@@ -927,7 +1017,7 @@ itemIDs <- as.character(activeAuthorAndTitel$itemID[1:forItems])
 # hier müsst ihr einstellen, welche ItemRaum ihr abdeckt.
 # bei mir wäre es - wie ihr seht - 1 bis 200.
 # Eric müsste dann bspw. 401 bis 600 einstellen
-meinBereich <- 101:101
+meinBereich <- 301:400
 
 tic("Start Recommendations")
 
@@ -938,15 +1028,16 @@ for(idx in meinBereich){
                                     weightTM = 0.3314368, 
                                     weightUT = 0.2146733,
                                     weightDupSes = 0.4538899)
+  
   ReccItems <- names(ReccItems)
   Recommendations[idx,] <- c(activeItemID, ReccItems)
   
   print(Recommendations[idx,2:6])
-  print(paste("just finished item:", idx, sep = " ")) #20= "46822"  "9762"  "1965" "20674" "54221" #101= "46822"  "9762"  "1965" "20674" "71120"
+  print(paste("just finished item:", idx, sep = " "))
   
 }
 
-Recommendations[meinBereich, ] 
+Recommendations[meinBereich, ]
 
 toc()
 
@@ -954,7 +1045,7 @@ toc()
 # Bitte gebt nach Recommendations nochmal den Wertebereich an, den ihr
 # abgedeckt habt - so wie hier meiner mit 1 bis 200.
 # Eric würde dann "Recommendations_401_600.csv" schreiben
-write.csv(Recommendations, "Recommendations_945_957.csv", row.names = FALSE)
+write.csv(Recommendations, "Recommendations_301_400.csv", row.names = FALSE)
 
 # zum Testen nochmal einlesen, ob auch alles geklappt hat
 readRecommendations <- read.csv("Recommendations_301_400.csv")
@@ -971,3 +1062,22 @@ readRecommendations <- read.csv("Recommendations_301_400.csv")
 # first100 <- apply(first100[1:ncol(first100)],2,as.double)
 # first100 <- as_tibble(first100)
 # save(first100, file = "team_1.rda")
+########################################################
+
+readRecommendations1_300 <- read.csv("Recommendations_1_300.csv")
+readRecommendations1_300 <- readRecommendations1_300[1:300, ]
+readRecommendations301_400 <- read.csv("Recommendations_301_400.csv")
+readRecommendations301_400 <- readRecommendations301_400[301:400, ]
+readRecommendations401_700 <- read.csv("Recommendations_401_700.csv")
+readRecommendations401_700 <- readRecommendations401_700[401:700, ]
+readRecommendations701_1000 <- read.csv("Recommendations_701_1000.csv")
+readRecommendations701_1000 <- readRecommendations701_1000[701:1000, ]
+
+finalRecommendations <- rbind(readRecommendations1_300, readRecommendations301_400, 
+                              readRecommendations401_700, readRecommendations701_1000)
+
+evaluation <- read.csv("evaluation.csv")
+
+evaluationFinal <- evaluation %>% left_join(finalRecommendations, by = c("itemID" = "activeItem"))
+#write.csv(evaluationFinal, "evaluation_team1.csv", row.names = FALSE)
+#test <- read.csv("evaluation_team1.csv")
